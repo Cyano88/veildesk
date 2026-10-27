@@ -1,0 +1,43 @@
+name: Verify PolyDesk compute providers
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        provider:
+          - '0x7DCFe6AEa70350C2090041524c9B4A9262DCe87D'
+          - '0x4870CbC4D07d6Ac2EE5aA865588e5985FE77a4E9'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: 0gfoundation/0g-pc-e2ee
+          ref: 06dccfe5d37505fd07ca6d1167c3f57c7c2004b1
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Build official verifier
+        working-directory: client/cmd/pcverify
+        run: go build -mod=readonly -o "$RUNNER_TEMP/pcverify" .
+      - name: Verify provider with no credentials or inference
+        env:
+          PROVIDER: ${{ matrix.provider }}
+        run: |
+          set -o pipefail
+          mkdir -p verification
+          date -u +%FT%TZ > verification/checked-at.txt
+          git rev-parse HEAD > verification/verifier-commit.txt
+          timeout 240s "$RUNNER_TEMP/pcverify" -provider "$PROVIDER" -strict 2>&1 | tee verification/provider.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: provider-${{ matrix.provider }}
+          path: verification/
+          retention-days: 14
