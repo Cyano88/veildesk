@@ -87,3 +87,31 @@ fn export() -> Result<JsonValue, &'static str> {
     result["transaction"]=evidence;Ok(result)
 }
 fn main(){match export(){Ok(value)=>println!("{}",value.dump()),Err(code)=>{eprintln!("{code}");std::process::exit(1)}}}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pepper_sync::wallet::{IronwoodNote, OrchardNote, OutputId};
+    use zingolib::mocks::orchard_note::OrchardCryptoNoteBuilder;
+    use zcash_primitives::transaction::TxId;
+    #[test]
+    fn native_notes_bind_receiver_account_scope_memo_value_and_output() {
+        let txid=TxId::from_bytes([7;32]);
+        let crypto=OrchardCryptoNoteBuilder::default().value(orchard::value::NoteValue::from_raw(123456)).build();
+        let receiver=crypto.recipient();
+        let make=|account,scope|IronwoodNote::new_for_test(OutputId::new(txid,7),account,scope,crypto.clone(),Memo::from_bytes(b"VD1:test-native-memo").unwrap(),None);
+        let note=make(zip32::AccountId::ZERO,zip32::Scope::External);
+        let exported=notes(&[note],&receiver,0,"fixture-address",&txid.to_string()).unwrap();
+        assert_eq!(exported.len(),1);assert_eq!(exported[0]["amountZat"].as_str(),Some("123456"));
+        assert_eq!(exported[0]["memo"].as_str(),Some("VD1:test-native-memo"));
+        assert_eq!(exported[0]["outputIndex"].as_u32(),Some(7));
+        assert!(notes(&[make(zip32::AccountId::ZERO,zip32::Scope::Internal)],&receiver,0,"fixture-address",&txid.to_string()).unwrap().is_empty());
+        assert!(notes(&[make(zip32::AccountId::ZERO,zip32::Scope::External)],&receiver,1,"fixture-address",&txid.to_string()).unwrap().is_empty());
+        assert!(notes(&[make(zip32::AccountId::ZERO,zip32::Scope::External)],&receiver,0,"fixture-address",&"0".repeat(64)).is_err());
+        let key=orchard::keys::SpendingKey::from_bytes([9;32]).unwrap();
+        let other=orchard::keys::FullViewingKey::from(&key).address_at(1u32,zip32::Scope::External);
+        assert!(notes(&[make(zip32::AccountId::ZERO,zip32::Scope::External)],&other,0,"fixture-address",&txid.to_string()).unwrap().is_empty());
+        let orchard=OrchardNote::new_for_test(OutputId::new(txid,2),zip32::AccountId::ZERO,zip32::Scope::External,crypto,Memo::from_bytes(b"VD1:orchard").unwrap(),None);
+        assert_eq!(notes(&[orchard],&receiver,0,"fixture-address",&txid.to_string()).unwrap().len(),1);
+    }
+}
