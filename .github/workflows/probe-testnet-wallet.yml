@@ -38,7 +38,8 @@ jobs:
           checks=[]
           with tempfile.TemporaryDirectory(prefix='veildesk-testnet-probe-') as directory:
               base=[binary,'--chain','testnet','--data-dir',directory]
-              requests=[('info',['--server','https://testnet.zec.rocks:443','--nosync','info']),('synced-height',['--server','https://testnet.zec.rocks:443','--waitsync','height']),('saved-height',['--offline','height']),('sync-status',['--offline','sync','status']),('notes',['--offline','notes','all'])]
+              # Persist finite-sync settings when creating this fresh wallet; Read preserves them.
+              requests=[('info',['--server','https://testnet.zec.rocks:443','--nosync','--waitsync','info']),('synced-height',['--server','https://testnet.zec.rocks:443','--waitsync','height']),('saved-height',['--offline','height']),('sync-status',['--offline','sync','status']),('notes',['--offline','notes','all'])]
               for name,args in requests:
                   start=time.monotonic()
                   record={'check':name}
