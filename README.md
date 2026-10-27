@@ -9,6 +9,13 @@ See [live deployment evidence](docs/render-live-2026-10-27.md). API access requi
 enrollment; this endpoint is not the browser demo. ZEC payments, trading and the
 OKX.AI listing remain disabled or pending.
 
+## Agent integration
+
+Use the [MCP agent adapter](docs/agent-mcp.md) to submit and retrieve private
+preview mandates directly through Render. It uses enrolled endpoint keys, not
+Privy, and requires no npm dependencies or local blockchain node. The SDK is also
+available for direct application integration.
+
 ## Run
 
 The relay/SDK package requires Node 24.14.x. No runtime dependencies.

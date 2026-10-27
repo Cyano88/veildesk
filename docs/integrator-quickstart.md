@@ -5,6 +5,16 @@ encrypted, signed response tied to that same mandate. It does not verify that a
 market exists, assess an outcome, create research or execute a trade. Keep that
 boundary in your application's UI and authorization model.
 
+## Connect to the live service
+
+The relay and provider are live on Render. Obtain a dedicated enrolled client
+configuration pointing to https://veildesk-relay.onrender.com; preserve its keys
+and your persistent outbox. No Privy login or blockchain node is required.
+Agents can use the [dependency-free MCP adapter](agent-mcp.md) with the existing
+source/package. Application integrations can call the SDK directly.
+
+The local pilot below is optional; it is not a requirement for cloud access.
+
 ## Install and run
 
 Use Node 24.14.x. Extract the release ZIP, then install its local package in your
@@ -32,8 +42,7 @@ Start relay and worker in separate terminals using the appropriate configuration
 Set `VEILDESK_CLIENT_CONFIG` to the absolute client.json path and
 `VEILDESK_CLIENT_STATE` to an absolute persistent outbox directory. In PowerShell,
 set variables with `$env:NAME='value'`; in a POSIX shell use `export NAME='value'`.
-The default relay URL is local http://127.0.0.1:5181. Remote operation requires
-operator-provided HTTPS and deployment acceptance.
+The default relay URL is local http://127.0.0.1:5181. For cloud operation use your enrolled Render configuration instead.
 
 ## Request contract
 

@@ -9,7 +9,8 @@
     "demo": "node scripts/demo.mjs",
     "relay": "node scripts/relay-server.mjs",
     "provider": "node scripts/provider-worker.mjs",
-    "acceptance": "node scripts/acceptance.mjs"
+    "acceptance": "node scripts/acceptance.mjs",
+    "mcp": "node scripts/mcp-server.mjs"
   },
   "engines": {
     "node": ">=24.14.0 <25"
@@ -33,5 +34,3 @@
     ".dockerignore"
   ]
 }
-
-
