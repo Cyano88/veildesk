@@ -25,7 +25,8 @@ export function createRelay({database,principals,providers,now=Date.now,maxPendi
  }
  for(const p of providers)if(!principals.some(x=>x.role==='provider'&&x.id===p.id)||!Array.isArray(p.capabilities)||typeof p.encryptionKey!=='string'||typeof p.signingKey!=='string')throw Error('Invalid provider configuration');
  if(new Set(providers.map(p=>p.id)).size!==providers.length)throw Error('Duplicate provider');
- providers=providers.map(p=>({id:p.id,encryptionKey:p.encryptionKey,signingKey:p.signingKey,capabilities:[...p.capabilities]}));
+ for(const p of providers)if(p.allowedClients!==undefined&&(!Array.isArray(p.allowedClients)||!p.allowedClients.length||new Set(p.allowedClients).size!==p.allowedClients.length||p.allowedClients.some(id=>!principals.some(x=>x.id===id&&x.role==='client'))))throw Error('Invalid private provider enrollment');
+ providers=providers.map(p=>({id:p.id,encryptionKey:p.encryptionKey,signingKey:p.signingKey,capabilities:[...p.capabilities],...(p.allowedClients?{allowedClients:[...p.allowedClients]}:{})}));
  const usage=new Map();
  const db=new DatabaseSync(database);db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;
  CREATE TABLE IF NOT EXISTS relay_jobs(client TEXT NOT NULL,id TEXT NOT NULL,provider TEXT NOT NULL,capability TEXT NOT NULL,request TEXT NOT NULL,request_hash TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('queued','processing','completed','expired')),created INTEGER NOT NULL,expires INTEGER NOT NULL,response TEXT,PRIMARY KEY(client,id));
@@ -61,10 +62,10 @@ export function createRelay({database,principals,providers,now=Date.now,maxPendi
     const minute=Math.floor(now()/60000),window=usage.get(principal.id);
     if(!window||window.minute!==minute)usage.set(principal.id,{minute,count:1});
     else if(++window.count>maxRequestsPerMinute){res.setHeader('Retry-After','60');fail(429,'Request rate exceeded')}
-    if(req.url==='/v1/providers'&&req.method==='GET')result={schema:'veildesk.providers.v1',providers};
+    if(req.url==='/v1/providers'&&req.method==='GET')result={schema:'veildesk.providers.v1',providers:providers.filter(p=>!p.allowedClients||p.allowedClients.includes(principal.id)||p.id===principal.id).map(({allowedClients,...descriptor})=>descriptor)};
     else if(req.url==='/v1/jobs'&&req.method==='POST'){
      if(principal.role!=='client')fail(403,'Forbidden');const b=await body(req);exact(b,['id','provider','capability','expiresAt','envelope']);validateRelayEnvelope(b.envelope,b.id,'request');
-     const provider=providers.find(x=>x.id===b.provider);if(!provider||!provider.capabilities.includes(b.capability))fail(400,'Unsupported provider capability');
+     const provider=providers.find(x=>x.id===b.provider);if(!provider||!provider.capabilities.includes(b.capability))fail(400,'Unsupported provider capability');if(provider.allowedClients&&!provider.allowedClients.includes(principal.id))fail(403,'Provider is privately enrolled');
      const e=b.envelope;
      const request=JSON.stringify({id:b.id,provider:b.provider,capability:b.capability,expiresAt:b.expiresAt,envelope:{version:e.version,id:e.id,direction:e.direction,ephemeralPublicKey:e.ephemeralPublicKey,salt:e.salt,iv:e.iv,ciphertext:e.ciphertext}}),hash=digest(request);const prior=db.prepare('SELECT * FROM relay_jobs WHERE client=? AND id=?').get(principal.id,b.id);
      if(prior){if(prior.request_hash!==hash)fail(409,'Job ID conflict');result=describe(prior)}

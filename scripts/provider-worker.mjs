@@ -1,14 +1,18 @@
+import {createRemoteWalletSettlement} from '../src/wallet-bridge.mjs';
 import {readFile,mkdir} from 'node:fs/promises';import {join} from 'node:path';import {setTimeout} from 'node:timers/promises';
 import {relayClient} from '../src/client.mjs';import {loadEndpointIdentity} from '../src/endpoint-identity.mjs';import {processClaim} from '../src/provider.mjs';
 import {createPaidProvider,PAID_CAPABILITY} from '../src/paid-provider.mjs';import {walletRpc} from '../src/wallet-rpc.mjs';
 process.umask(0o077);
 const file=process.env.VEILDESK_PROVIDER_CONFIG;if(!file)throw Error('Set VEILDESK_PROVIDER_CONFIG');
 const config=JSON.parse(await readFile(file,'utf8')),keys=await loadEndpointIdentity(config.identity),rpc=relayClient(config);
+const bridgeRaw=process.env.VEILDESK_WALLET_CLIENT_JSON;delete process.env.VEILDESK_WALLET_CLIENT_JSON;
+const bridge=bridgeRaw?JSON.parse(bridgeRaw):null;
+const settlement=bridge?createRemoteWalletSettlement({...bridge,...keys,rpc:relayClient(bridge)}):undefined;
 let paid;
 if(config.testnetPayment?.enabled===true){
  await mkdir(config.stateDirectory,{recursive:true,mode:0o700});
  const p=config.testnetPayment;
- paid=createPaidProvider({...p,...keys,peers:config.peers,database:join(config.stateDirectory,'testnet-payments.db'),nodeRpc:walletRpc(p.node),walletRpc:walletRpc(p.wallet)});
+ paid=createPaidProvider({...p,...keys,peers:config.peers,database:join(config.stateDirectory,'testnet-payments.db'),...(settlement?{settlement}:{nodeRpc:walletRpc(p.node),walletRpc:walletRpc(p.wallet)})});
 }
 let stop=false;for(const sig of ['SIGINT','SIGTERM'])process.on(sig,()=>stop=true);
 const {providerScheduler}=await import('../src/provider-scheduler.mjs');
