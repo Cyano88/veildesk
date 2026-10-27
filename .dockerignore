@@ -12,3 +12,7 @@
 !scripts/backup-relay.mjs
 !scripts/payment-preflight.mjs
 !scripts/mandate-client.mjs
+!scripts/light-wallet-worker.mjs
+!ops/
+!ops/light-wallet/
+!ops/light-wallet/Dockerfile
