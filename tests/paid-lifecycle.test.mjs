@@ -131,3 +131,23 @@ test('restored client outbox retains mandate and payment-hint binding',async()=>
   await f.process(job);assert.deepEqual((await restored.get(job.id)).result,(await f.client.get(job.id)).result);
  }finally{await f.close()}
 });
+
+test('native settlement backend gates authenticated payment and preserves restart replay without Zallet RPC',async()=>{
+ const {createLightWalletSettlement}=await import('../src/settlement.mjs');
+ const {nativePaymentFixture}=await import('./fixtures/native-payment.mjs');
+ const f=await setup();try{
+  const fixture=nativePaymentFixture({address:f.context.address,txid,now:f.context.now});
+  f.context.settlement=createLightWalletSettlement({capture:fixture.capture,accountId:0,address:f.context.address,now:f.context.now});
+  f.context.nodeRpc=f.context.walletRpc=()=>{throw Error('Zallet must not be called by native backend')};f.restart();
+  fixture.setBranch('ffffffff');await assert.rejects(f.process(),/unsupported/);assert.equal((await f.client.get(f.job.id)).payment,undefined);
+  fixture.setBranch('77190ad9');await f.process();const quote=(await f.client.get(f.job.id)).payment;
+  fixture.setInvoice(quote.invoice);const job=await f.fund();
+  await f.process(job);const received=await f.client.get(job.id);
+  assert.equal(received.result.payload.paymentVerified,true);assert.equal(received.result.payload.tradeSubmitted,false);
+  assert.equal(received.result.payload.payment.noteId,txid+':ironwood:0');
+  f.restart();await f.process(job);assert.deepEqual((await f.client.get(job.id)).result,received.result);
+  assert.ok(fixture.captures()>=6);
+  f.context.settlement=createLightWalletSettlement({capture:fixture.capture,accountId:1,address:f.context.address,now:f.context.now});f.restart();
+  await assert.rejects(f.process(job),/binding conflict/);
+ }finally{await f.close()}
+});

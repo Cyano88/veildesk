@@ -18,7 +18,10 @@ export function verifyScan(info,progress,saved){
   const count=progress['total_'+unit],scanned=progress['total_'+unit+'_scanned'];
   if(!Number.isSafeInteger(count)||count<0||scanned!==count||progress['percentage_total_'+unit+'_scanned']!==100)throw Error('wallet_scan_incomplete');
  }
- return {network:'test',height:saved.height,syncReady:true,settlementVerified:false,paidFulfillmentEnabled:false};
+ const branch=info.consensus_branch_id;
+ const consensusBranchId=Number.isSafeInteger(branch)&&branch>=0&&branch<=0xffffffff?branch.toString(16).padStart(8,'0'):
+  typeof branch==='string'&&/^(?:0x)?[a-fA-F0-9]{8}$/.test(branch)?branch.replace(/^0x/,'').toLowerCase():undefined;
+ return {network:'test',height:saved.height,syncReady:true,settlementVerified:false,paidFulfillmentEnabled:false,consensusBranchId};
 }
 
 // Only fixed read/sync commands are reachable. Never forward arbitrary CLI arguments or raw output to logs.

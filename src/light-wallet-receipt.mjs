@@ -5,7 +5,7 @@ const hash=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);
 // invokes the native exporter under the same exclusive wallet lock. Never accept a
 // buyer-supplied snapshot or substitute CLI note summaries. This trusts the configured
 // light-wallet indexer; it is not independent full-node consensus verification.
-function inspect(snapshot,{invoice,accountId,txid,minimumConfirmations,now}){
+export function verifyLightWalletSnapshot(snapshot,{address,accountId,now}){
  const {evidence:e,scan,capturedAt}=snapshot??{};
  const scannedAt=Date.parse(scan?.checkedAt);
  if(!Number.isSafeInteger(capturedAt)||capturedAt>now||now-capturedAt>30000||!Number.isFinite(scannedAt)
@@ -13,8 +13,12 @@ function inspect(snapshot,{invoice,accountId,txid,minimumConfirmations,now}){
   ||e?.schema!=='veildesk.light-wallet-evidence.v1'||e.network!=='test'||!hash(e.walletDigest)
   ||!Number.isSafeInteger(e.tip?.height)||e.tip.height<1||!hash(e.tip.hash)||scan.height!==e.tip.height)
   throw Error('Fresh complete light-wallet evidence required');
- if(e.recipient?.tracked!==true||e.recipient.accountId!==accountId||e.recipient.address!==invoice.address)
+ if(e.recipient?.tracked!==true||e.recipient.accountId!==accountId||e.recipient.address!==address)
   throw Error('Light-wallet recipient binding mismatch');
+ return e;
+}
+function inspect(snapshot,{invoice,accountId,txid,minimumConfirmations,now}){
+ const e=verifyLightWalletSnapshot(snapshot,{address:invoice.address,accountId,now});
  const tx=e.transaction;
  if(tx===null)return {state:now>=invoice.expiresAt?'expired_unpaid':'awaiting_payment',executionAuthorized:false};
  if(!tx||tx.txid!==txid||tx.shieldedOnly!==true||!Number.isSafeInteger(tx.actionCount)||tx.actionCount<1

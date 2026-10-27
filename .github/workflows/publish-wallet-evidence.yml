@@ -1,0 +1,24 @@
+name: Publish native wallet evidence exporter
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-wallet-evidence
+          path: evidence-build
+          github-token: ${{ github.token }}
+          run-id: 40600640309
+      - name: Verify and publish tested read-only executable
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(gh run view 40600640309 --repo Cyano88/veildesk --json conclusion --jq .conclusion)" = success
+          cd evidence-build
+          sha256sum -c sha256.txt
+          gh release create wallet-evidence-bfb0a21-v1 --repo Cyano88/veildesk --title "Native read-only wallet evidence exporter" --notes "Scoped native testnet recipient and shielded transaction evidence. Built against pinned zingolib bfb0a2156819ea7f75a9b09b1724abfd06c8925e with Rust ownership tests. Contains no wallet data. No spend functionality. Not proof of a real payment." veildesk-evidence sha256.txt
