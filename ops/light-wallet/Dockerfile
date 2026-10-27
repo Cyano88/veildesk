@@ -13,7 +13,7 @@ RUN curl -fLsS https://github.com/Cyano88/veildesk/releases/download/wallet-evid
     echo "4fbeab26d309c3dfe10acdfc5c7f5bb0912e2672b6679f4981e3a4f1b422e0e1  /opt/veildesk-wallet/veildesk-evidence" | sha256sum -c - && \
     chmod 700 /opt/veildesk-wallet/veildesk-evidence
 COPY src ./src/
-COPY scripts/light-wallet-worker.mjs ./scripts/
+COPY scripts/light-wallet-worker.mjs scripts/testnet-buyer-bootstrap.mjs ./scripts/
 ENV ZINGO_NYM_PROXY=/opt/veildesk-wallet/nym-proxy
 # No network listener, wallet RPC, spend command or publicly exposed port.
 CMD ["flock","--no-fork","/var/data/veildesk-wallet-process.lock","node","scripts/light-wallet-worker.mjs"]
