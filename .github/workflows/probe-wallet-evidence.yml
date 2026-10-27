@@ -1,0 +1,71 @@
+name: Probe native wallet receipt evidence
+on:
+  workflow_run:
+    workflows: [Build native wallet evidence exporter]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: Successful native exporter build
+        required: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  probe:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.1
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-wallet-evidence
+          path: evidence-build
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.build_run_id || github.event.workflow_run.id }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: cloud-light-wallet-kit
+          path: wallet-build
+          github-token: ${{ github.token }}
+          run-id: 40589172064
+      - name: Verify native recipient and unknown-payment handling without funds
+        env:
+          ZINGO_NYM_PROXY: ${{ github.workspace }}/wallet-build/nym-proxy
+        run: |
+          sha256sum -c wallet-build/sha256.txt
+          (cd evidence-build && sha256sum -c sha256.txt)
+          chmod 700 wallet-build/zingo-cli wallet-build/nym-proxy evidence-build/veildesk-evidence
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import {mkdtemp,rm} from 'node:fs/promises';
+          import {join,resolve} from 'node:path';
+          import {randomBytes} from 'node:crypto';
+          import {syncWalletCycle,walletCommand} from './src/light-wallet-worker.mjs';
+          import {captureNativeEvidence} from './src/light-wallet-capture.mjs';
+          import {verifyLightWalletReceipt} from './src/light-wallet-receipt.mjs';
+          import {invoice} from './src/zcash.mjs';
+          const root=await mkdtemp(join(process.env.RUNNER_TEMP,'native-evidence-'));
+          const binary=resolve('wallet-build/zingo-cli'),native=resolve('evidence-build/veildesk-evidence');
+          const password=randomBytes(32).toString('hex');
+          try{
+            let scan=await syncWalletCycle({root,binary,password});
+            const addresses=await walletCommand(binary,join(root,'wallet'),'addresses');
+            const address=addresses[0].encoded_address,accountId=addresses[0].account,txid='0'.repeat(64);
+            const query={address,accountId,txid};
+            const snapshot=await captureNativeEvidence({root,binary:native,query,scan});
+            assert.equal(snapshot.evidence.recipient.tracked,true);
+            assert.equal(snapshot.evidence.transaction,null);
+            const i=invoice({address,amount:'0.001',network:'test'});
+            const receipt=await verifyLightWalletReceipt({invoice:i,accountId,txid,capture:async()=>snapshot});
+            assert.equal(receipt.state,'awaiting_payment');assert.equal(receipt.executionAuthorized,false);
+            await assert.rejects(captureNativeEvidence({root,binary:native,query:{...query,accountId:accountId+1},scan}));
+            console.log(JSON.stringify({nativeRecipientVerified:true,height:scan.height,unknownPayment:receipt.state,wrongAccountRejected:true,funded:false,settlementVerified:false}));
+          }finally{await rm(root,{recursive:true,force:true})}
+          JS
