@@ -39,14 +39,14 @@ jobs:
           with tempfile.TemporaryDirectory(prefix='veildesk-testnet-probe-') as directory:
               base=[binary,'--chain','testnet','--data-dir',directory]
               # Persist finite-sync settings when creating this fresh wallet; Read preserves them.
-              requests=[('info',['--server','https://testnet.zec.rocks:443','--nosync','--waitsync','info']),('synced-height',['--server','https://testnet.zec.rocks:443','--waitsync','height']),('saved-height',['--offline','height']),('sync-status',['--offline','sync','status']),('notes',['--offline','notes','all'])]
+              requests=[('info',['--server','https://testnet.zec.rocks:443','--nosync','--waitsync','info']),('sync-status',['--server','https://testnet.zec.rocks:443','--waitsync','sync','status']),('saved-height',['--offline','height']),('notes',['--offline','notes','all'])]
               for name,args in requests:
                   start=time.monotonic()
                   record={'check':name}
                   try:
                       process=subprocess.Popen(base+args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True)
                       try:
-                          stdout,stderr=process.communicate(timeout=540 if name=='synced-height' else 90)
+                          stdout,stderr=process.communicate(timeout=540 if name=='sync-status' else 90)
                       except subprocess.TimeoutExpired:
                           os.killpg(process.pid,signal.SIGKILL)
                           stdout,stderr=process.communicate()
@@ -79,7 +79,7 @@ jobs:
           pathlib.Path('testnet-wallet-probe.json').write_text(json.dumps(result,indent=2))
           if not all(c.get('exitCode')==0 and c.get('json') for c in checks): raise SystemExit(1)
           info=next(c for c in checks if c['check']=='info')
-          synced=next(c for c in checks if c['check']=='synced-height')
+          synced=next(c for c in checks if c['check']=='saved-height')
           if info.get('chain_name') not in ['test','testnet']: raise SystemExit(1)
           tip=info.get('latest_block_height')
           if not isinstance(tip,int) or tip<=0 or synced.get('height',0)<tip: raise SystemExit(1)
