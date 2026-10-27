@@ -38,7 +38,7 @@ jobs:
           checks=[]
           with tempfile.TemporaryDirectory(prefix='veildesk-testnet-probe-') as directory:
               base=[binary,'--chain','testnet','--data-dir',directory]
-              requests=[('info',['--server','https://testnet.zec.rocks:443','--nosync','info']),('synced-height',['--server','https://testnet.zec.rocks:443','--waitsync','height']),('saved-height',['--offline','height']),('notes',['--offline','notes','all'])]
+              requests=[('info',['--server','https://testnet.zec.rocks:443','--nosync','info']),('synced-height',['--server','https://testnet.zec.rocks:443','--waitsync','height']),('saved-height',['--offline','height']),('sync-status',['--offline','sync','status']),('notes',['--offline','notes','all'])]
               for name,args in requests:
                   start=time.monotonic()
                   record={'check':name}
@@ -50,6 +50,7 @@ jobs:
                           os.killpg(process.pid,signal.SIGKILL)
                           stdout,stderr=process.communicate()
                           record['errorCategories']=[word for word in ['timeout','connect','tls','mixnet','proxy','chain','sync','offline','checkpoint','tree','retry','error','panic'] if word in stderr.lower()]
+                          record['phasesObserved']=[phrase for phrase in ['bootstrapping a dedicated sweep transport','surveying','judging the live cohort','Launching sync task','Sync result:','This Sync Session does not open'] if phrase in stderr]
                           raise
                       p=subprocess.CompletedProcess(base+args,process.returncode,stdout,stderr)
                       record['exitCode']=p.returncode
@@ -58,6 +59,10 @@ jobs:
                               data=json.loads(p.stdout)
                               record['json']=True
                               record['keys']=sorted(data.keys()) if isinstance(data,dict) else []
+                              if name=='sync-status' and isinstance(data,dict):
+                                  for key in ['sync_start_height','total_blocks_scanned','total_blocks','total_outputs_scanned','total_outputs','percentage_total_blocks_scanned','percentage_total_outputs_scanned']:
+                                      value=data.get(key)
+                                      if type(value) in [int,float]: record[key]=value
                               for key in ['height','block_height','latest_block_height','chain_name','chain','network']:
                                   value=data.get(key) if isinstance(data,dict) else None
                                   if isinstance(value,int) or value in ['test','testnet']:
@@ -77,6 +82,10 @@ jobs:
           if info.get('chain_name') not in ['test','testnet']: raise SystemExit(1)
           tip=info.get('latest_block_height')
           if not isinstance(tip,int) or tip<=0 or synced.get('height',0)<tip: raise SystemExit(1)
+          progress=next(c for c in checks if c['check']=='sync-status')
+          if progress.get('sync_start_height',0)<=0: raise SystemExit(1)
+          if any(progress.get(key)!=100 for key in ['percentage_total_blocks_scanned','percentage_total_outputs_scanned']): raise SystemExit(1)
+          if any(progress.get('total_'+unit+'_scanned')!=progress.get('total_'+unit) for unit in ['blocks','outputs']): raise SystemExit(1)
       - uses: actions/upload-artifact@v4
         if: always()
         with:
