@@ -1,0 +1,64 @@
+name: Probe cloud testnet wallet sync
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: cloud-light-wallet-candidate
+          path: wallet-build
+          github-token: ${{ github.token }}
+          run-id: 40587481697
+      - name: Verify binary
+        run: |
+          test "$(cat wallet-build/source-commit.txt)" = bfb0a2156819ea7f75a9b09b1724abfd06c8925e
+          sha256sum -c wallet-build/sha256.txt
+          chmod 700 wallet-build/zingo-cli
+      - name: Inspect testnet with a fresh unfunded wallet
+        shell: python
+        run: |
+          import json, os, subprocess, tempfile, pathlib, time
+          os.umask(0o077)
+          binary=str(pathlib.Path('wallet-build/zingo-cli').resolve())
+          checks=[]
+          with tempfile.TemporaryDirectory(prefix='veildesk-testnet-probe-') as directory:
+              base=[binary,'--chain','testnet','--data-dir',directory]
+              requests=[('info',['--server','https://testnet.zec.rocks:443','info']),('synced-height',['--server','https://testnet.zec.rocks:443','--waitsync','height']),('notes',['--offline','notes','all'])]
+              for name,args in requests:
+                  start=time.monotonic()
+                  record={'check':name}
+                  try:
+                      p=subprocess.run(base+args,capture_output=True,text=True,timeout=180)
+                      record['exitCode']=p.returncode
+                      if p.returncode==0:
+                          try:
+                              data=json.loads(p.stdout)
+                              record['json']=True
+                              record['keys']=sorted(data.keys()) if isinstance(data,dict) else []
+                              for key in ['height','block_height','chain_name','chain','network']:
+                                  value=data.get(key) if isinstance(data,dict) else None
+                                  if isinstance(value,int) or value in ['test','testnet']:
+                                      record[key]=value
+                          except (ValueError,TypeError): record['json']=False
+                      else:
+                          record['errorCategories']=[word for word in ['timeout','connect','tls','mixnet','proxy','chain','sync','offline'] if word in p.stderr.lower()]
+                  except subprocess.TimeoutExpired: record['timeout']=True
+                  record['seconds']=round(time.monotonic()-start,2)
+                  checks.append(record)
+                  print(json.dumps(record),flush=True)
+          result={'sourceCommit':'bfb0a2156819ea7f75a9b09b1724abfd06c8925e','configuredNetwork':'testnet','server':'https://testnet.zec.rocks:443','funded':False,'settlementVerified':False,'checks':checks}
+          pathlib.Path('testnet-wallet-probe.json').write_text(json.dumps(result,indent=2))
+          if not all(c.get('exitCode')==0 and c.get('json') for c in checks): raise SystemExit(1)
+          if not any(c.get('check')=='synced-height' and c.get('height',0)>0 for c in checks): raise SystemExit(1)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: testnet-wallet-probe
+          path: testnet-wallet-probe.json
+          retention-days: 7
