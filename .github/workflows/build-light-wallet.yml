@@ -1,0 +1,35 @@
+name: Build cloud light wallet candidate
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: zingolabs/zingolib
+          ref: bfb0a2156819ea7f75a9b09b1724abfd06c8925e
+          persist-credentials: false
+      - name: Install build prerequisites on runner
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler pkg-config libssl-dev libsqlite3-dev
+          rustup toolchain install 1.99.0 --profile minimal
+      - name: Build pinned CLI
+        run: cargo +1.99.0 build --locked --release --package zingo-cli
+      - name: Inspect CLI without initializing a wallet
+        run: |
+          mkdir -p wallet-build
+          git rev-parse HEAD > wallet-build/source-commit.txt
+          target/release/zingo-cli --help > wallet-build/cli-help.txt
+          cp target/release/zingo-cli wallet-build/zingo-cli
+          sha256sum wallet-build/zingo-cli > wallet-build/sha256.txt
+          ldd wallet-build/zingo-cli > wallet-build/runtime-libraries.txt || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cloud-light-wallet-candidate
+          path: wallet-build/
+          retention-days: 3
