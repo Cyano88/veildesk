@@ -14,7 +14,7 @@ export const paymentHash=value=>createHash('sha256').update(JSON.stringify(value
 export function createPaidProvider({database,network,account,address,amount,nodeRpc,walletRpc,recipient,signer,peers,now=Date.now,settlement}){
  if(network!=='test'||typeof account!=='string'||!/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(account)||typeof address!=='string'||!address||(!settlement&&(typeof nodeRpc!=='function'||typeof walletRpc!=='function')))throw Error('Invalid testnet payment configuration');zats(amount);
  const paymentBackend=settlement??createZalletSettlement({nodeRpc,walletRpc,account,address});
- if(!/^(?:zallet-testnet-v1|zingolib-testnet-v1:[0-9]+)$/.test(paymentBackend.id)||['preflight','recipient','verify'].some(name=>typeof paymentBackend[name]!=='function'))throw Error('Invalid trusted settlement backend');
+ if(paymentBackend.address!==address||!/^(?:zallet-testnet-v1|zingolib-testnet-v1:[0-9]+)$/.test(paymentBackend.id)||['preflight','recipient','verify'].some(name=>typeof paymentBackend[name]!=='function'))throw Error('Invalid trusted settlement backend');
  const db=new DatabaseSync(database);db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;
  CREATE TABLE IF NOT EXISTS paid_jobs(owner TEXT PRIMARY KEY,binding TEXT NOT NULL,issued INTEGER NOT NULL,invoice TEXT NOT NULL,challenge TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'awaiting',note TEXT,blockhash TEXT,result TEXT,review TEXT);
  CREATE TABLE IF NOT EXISTS paid_notes(note TEXT PRIMARY KEY,owner TEXT NOT NULL);`);

@@ -147,6 +147,7 @@ test('native settlement backend gates authenticated payment and preserves restar
   assert.equal(received.result.payload.payment.noteId,txid+':ironwood:0');
   f.restart();await f.process(job);assert.deepEqual((await f.client.get(job.id)).result,received.result);
   assert.ok(fixture.captures()>=6);
+  assert.throws(()=>createPaidProvider({...f.context,settlement:createLightWalletSettlement({capture:fixture.capture,accountId:0,address:'wrong-recipient',now:f.context.now})}),/Invalid trusted settlement/);
   f.context.settlement=createLightWalletSettlement({capture:fixture.capture,accountId:1,address:f.context.address,now:f.context.now});f.restart();
   await assert.rejects(f.process(job),/binding conflict/);
  }finally{await f.close()}
