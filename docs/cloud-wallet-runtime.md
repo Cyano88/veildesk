@@ -1,6 +1,6 @@
 # Persistent cloud testnet wallet
 
-This is an unfunded recipient-wallet runtime, not a payment verifier. Paid service fulfillment remains disabled. PolyDesk still owns research, Tavily and 0G; the wallet runtime has none of those credentials.
+This is an unfunded recipient-wallet runtime with native receipt verification and an authenticated encrypted request bridge. Paid service fulfillment remains disabled pending a funded acceptance test. PolyDesk still owns research, Tavily and 0G; the wallet runtime has none of those credentials.
 
 Render service: `srv-dbgiegcs728c73e6oit0` (`veildesk-light-wallet`), Oregon starter background worker, one instance, 1 GB persistent disk at `/var/data`. There is no public port or wallet RPC. Its Docker image pins the wallet kit SHA-256 and source revision. The OS `flock` prevents concurrent worker ownership; wallet operations are serialized and expose only fixed info, sync, height and address commands. There is no spend command in the wrapper.
 
@@ -22,4 +22,6 @@ Operator files are under the ignored `private/render-live-20261027` directory. P
 
 ## Remaining acceptance
 
-The native light-wallet receipt adapter is implemented and its recipient preflight is deployed; see docs/native-wallet-receipts.md. Connect authenticated provider capture requests to the single wallet owner before live paid acceptance. CLI summary notes do not prove exact invoice recipient or canonical block binding and must not be passed off as Zallet evidence. Then verify one real shielded testnet payment bound to an authenticated service request, exercise replay/reorg/late-payment handling, and complete encrypted PolyDesk report delivery. Mainnet payment acceptance and trade execution are not enabled.
+The native receipt adapter and private wallet bridge are deployed; see docs/native-wallet-receipts.md. The dedicated provider client can submit signed, encrypted preflight and receipt queries to the single wallet owner. Other relay clients cannot discover the wallet provider or queue requests for it. Wallet capture stays serialized under the existing exclusive lock; no public wallet RPC or spend command is exposed.
+
+Still required: fund a separate testnet buyer, verify one real shielded payment bound to an authenticated service invoice, exercise replay/reorg/late-payment handling, and complete encrypted PolyDesk report delivery. CLI summaries are not receipt evidence. Mainnet payment acceptance and trade execution are not enabled.

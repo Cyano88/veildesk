@@ -20,6 +20,12 @@ The capture callback is trusted host code, never buyer-supplied JSON. Production
 - Full VeilDesk working-tree suite: 72 passed, two optional checks skipped. Additional focused recipient-configuration regression passed after the full run.
 - Independent buyer-process test through the actual PolyDesk research engine and native backend passed with controlled market/model and synthetic native chain evidence. A wrong memo could not invoke research; encrypted report delivery and restart replay invoked the engine/model once. This is integration evidence, not live settlement.
 
-## Still pending
+## Private bridge and remaining acceptance
 
-Connect the provider to the single cloud wallet owner through authenticated private capture requests; do not expose raw wallet RPC or run a second writer on its files. The current background worker performs only native receiving-account preflight and does not serve remote receipt queries. Then provision/fund a separate testnet buyer, bind a shielded purchase to an authenticated invoice, verify its actual recipient note and confirmations, and deliver the encrypted PolyDesk report. Paid service capability remains disabled until that acceptance completes. Mainnet payments and trade execution remain separately unauthorized.
+The private bridge is deployed in commit b528680. `src/wallet-bridge.mjs` authenticates enrolled clients, encrypts queries and results, binds each result to its query, rejects stale attestations and persists replay responses without repeating wallet work. Relay enrollment hides and restricts the wallet provider to its dedicated client. The wallet worker serializes fresh synchronization and native capture; the provider never opens the wallet files. These are trusted wallet attestations, not public cryptographic proofs of settlement.
+
+Local bridge tests cover encrypted HTTP transport, private enrollment, replay, wrong account, stale signed results and absence of plaintext recipient/memo in relay storage. The original working-tree suite passes 74 tests with two optional checks skipped.
+
+Still required: provision/fund a separate testnet buyer, bind a shielded purchase to an authenticated invoice, verify its actual recipient note and confirmations, and deliver the encrypted PolyDesk report. Paid service capability remains disabled until that acceptance completes. Mainnet payments and trade execution remain separately unauthorized.
+
+Live Render provider-to-wallet probe on 2026-10-28 passed: bridgeAuthenticated=true, recipientTracked=true, unknownPaymentState=awaiting_payment, settlementVerified=false, tradeSubmitted=false. This verifies deployed authenticated transport and rejection of an unknown transaction; it is not funded settlement evidence.
