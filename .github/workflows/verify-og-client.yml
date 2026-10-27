@@ -1,0 +1,39 @@
+name: Verify 0G sealed client
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: 0gfoundation/0g-pc-e2ee
+          ref: 06dccfe5d37505fd07ca6d1167c3f57c7c2004b1
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Test encryption and wire contract
+        working-directory: protocol
+        run: go test -mod=readonly ./...
+      - name: Test sealing, verification, routing and proxy boundaries
+        working-directory: client
+        run: go test -mod=readonly ./core ./route ./openaiproxy ./cmd/internal/proxycli
+      - name: Build Linux client
+        working-directory: client
+        run: |
+          mkdir -p ../sealed-client
+          CGO_ENABLED=0 go build -mod=readonly -trimpath -o ../sealed-client/og-sealed-client ./cmd/sidecar
+          git rev-parse HEAD > ../sealed-client/source-commit.txt
+          cd ../sealed-client
+          sha256sum og-sealed-client > SHA256SUMS
+      - name: Preserve tested binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: og-sealed-client-linux-amd64
+          path: sealed-client/
+          retention-days: 14
