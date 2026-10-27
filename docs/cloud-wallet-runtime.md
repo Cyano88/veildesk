@@ -12,7 +12,7 @@ An initial AES-256-GCM encrypted checkpoint is created while the wallet process 
 
 ## Evidence
 
-- Cloud worker integration: https://github.com/Cyano88/veildesk/actions/runs/40595593837 — two sync/recovery/reopen cycles passed at testnet heights 4548897 and 4548898.
+- Cloud worker integration: https://github.com/Cyano88/veildesk/actions/runs/40595593837 â€” two sync/recovery/reopen cycles passed at testnet heights 4548897 and 4548898.
 - First Render deployment `dep-dbgiegks728c73e6ojh0` went live, then returned sync-ready at height 4548906 with offline recovery verified at 2026-10-27 22:37:37 UTC.
 - Explicit Render restart at 22:38:44 UTC retained the same receiving identity and returned sync-ready at height 4548909 at 22:39:36 UTC.
 - The initial encrypted recovery copy was downloaded privately (1258 bytes) and its SHA-256 matched the cloud file. No seed or plaintext wallet was downloaded. A separate Windows-DPAPI-protected recovery password copy is in the ignored operator directory, and Render holds its runtime secret.
@@ -22,4 +22,4 @@ Operator files are under the ignored `private/render-live-20261027` directory. P
 
 ## Remaining acceptance
 
-Implement the native light-wallet receipt adapter. CLI summary notes do not prove exact invoice recipient or canonical block binding and must not be passed off as Zallet evidence. Then verify one real shielded testnet payment bound to an authenticated service request, exercise replay/reorg/late-payment handling, and complete encrypted PolyDesk report delivery. Mainnet payment acceptance and trade execution are not enabled.
+The native light-wallet receipt adapter is implemented and its recipient preflight is deployed; see docs/native-wallet-receipts.md. Connect authenticated provider capture requests to the single wallet owner before live paid acceptance. CLI summary notes do not prove exact invoice recipient or canonical block binding and must not be passed off as Zallet evidence. Then verify one real shielded testnet payment bound to an authenticated service request, exercise replay/reorg/late-payment handling, and complete encrypted PolyDesk report delivery. Mainnet payment acceptance and trade execution are not enabled.
