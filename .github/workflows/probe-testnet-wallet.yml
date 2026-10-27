@@ -31,7 +31,7 @@ jobs:
       - name: Inspect testnet with a fresh unfunded wallet
         shell: python
         run: |
-          import json, os, subprocess, tempfile, pathlib, time
+          import json, os, signal, subprocess, tempfile, pathlib, time
           os.umask(0o077)
           binary=str(pathlib.Path('wallet-build/zingo-cli').resolve())
           os.environ['ZINGO_NYM_PROXY']=str(pathlib.Path('wallet-build/nym-proxy').resolve())
@@ -43,7 +43,14 @@ jobs:
                   start=time.monotonic()
                   record={'check':name}
                   try:
-                      p=subprocess.run(base+args,capture_output=True,text=True,timeout=180)
+                      process=subprocess.Popen(base+args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True)
+                      try:
+                          stdout,stderr=process.communicate(timeout=180)
+                      except subprocess.TimeoutExpired:
+                          os.killpg(process.pid,signal.SIGKILL)
+                          process.communicate()
+                          raise
+                      p=subprocess.CompletedProcess(base+args,process.returncode,stdout,stderr)
                       record['exitCode']=p.returncode
                       if p.returncode==0:
                           try:
