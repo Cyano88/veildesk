@@ -31,6 +31,20 @@ jobs:
           git rev-parse HEAD > ../sealed-client/source-commit.txt
           cd ../sealed-client
           sha256sum og-sealed-client > SHA256SUMS
+      - name: Check strict client startup and public provider readiness
+        shell: bash
+        run: |
+          set +e
+          timeout --signal=TERM 55s ./sealed-client/og-sealed-client \
+            -listen=127.0.0.1:8787 -router-url=https://router-api.0g.ai -provider-url= \
+            -attest=true -attest-enforce=true -onchain=true -onchain-enforce=true \
+            -verify-responses=true -runtime-releases=true -provider-enforce=true \
+            -network=mainnet -chain-rpc-url= -serving-contract= -pccs-url= \
+            -warm=true -resp-bind=true > sealed-client/readiness.log 2>&1
+          status=$?
+          cat sealed-client/readiness.log
+          # Timeout ends a read-only warm-up, not proof that an inference can complete.
+          test "$status" -eq 0 -o "$status" -eq 124
       - name: Preserve tested binary
         uses: actions/upload-artifact@v4
         with:
