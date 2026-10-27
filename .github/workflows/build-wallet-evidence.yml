@@ -1,0 +1,41 @@
+name: Build native wallet evidence exporter
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: veildesk
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: zingolabs/zingolib
+          ref: bfb0a2156819ea7f75a9b09b1724abfd06c8925e
+          path: upstream
+          persist-credentials: false
+      - name: Compile read-only exporter in pinned workspace
+        env:
+          CARGO_BUILD_JOBS: 2
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler pkg-config libssl-dev libsqlite3-dev
+          rustup toolchain install 1.99.0 --profile minimal
+          mkdir -p upstream/zingolib/src/bin
+          cp veildesk/ops/light-wallet/native/veildesk-evidence.rs upstream/zingolib/src/bin/
+          cd upstream
+          cargo +1.99.0 build --locked --release --package zingolib --bin veildesk-evidence
+          mkdir -p ../evidence-build
+          cp target/release/veildesk-evidence ../evidence-build/
+          cd ../evidence-build
+          sha256sum veildesk-evidence > sha256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-wallet-evidence
+          path: evidence-build/
+          retention-days: 3
