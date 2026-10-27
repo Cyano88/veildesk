@@ -1,0 +1,16 @@
+FROM node:24.14.1-bookworm-slim AS node
+FROM ubuntu:24.04
+RUN apt-get update -qq && apt-get install -y --no-install-recommends ca-certificates curl libssl3 libsqlite3-0 libstdc++6 util-linux && rm -rf /var/lib/apt/lists/*
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+WORKDIR /app
+ARG WALLET_RELEASE=wallet-kit-bfb0a21-v1
+RUN mkdir -p /opt/veildesk-wallet && cd /opt/veildesk-wallet && \
+    curl -fLsS "https://github.com/Cyano88/veildesk/releases/download/${WALLET_RELEASE}/wallet-kit.tar.gz" -o kit.tar.gz && \
+    curl -fLsS "https://github.com/Cyano88/veildesk/releases/download/${WALLET_RELEASE}/wallet-kit.tar.gz.sha256" -o kit.sha256 && \
+    sha256sum -c kit.sha256 && tar -xzf kit.tar.gz && rm kit.tar.gz kit.sha256 && \
+    test "$(cat source-commit.txt)" = bfb0a2156819ea7f75a9b09b1724abfd06c8925e && chmod 700 zingo-cli nym-proxy
+COPY src/checkpoint.mjs src/light-wallet-worker.mjs ./src/
+COPY scripts/light-wallet-worker.mjs ./scripts/
+ENV ZINGO_NYM_PROXY=/opt/veildesk-wallet/nym-proxy
+# No network listener, wallet RPC, spend command or publicly exposed port.
+CMD ["flock","--no-fork","/var/data/veildesk-wallet-process.lock","node","scripts/light-wallet-worker.mjs"]

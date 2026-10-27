@@ -1,0 +1,53 @@
+name: Publish verified cloud wallet kit
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.1
+      - uses: actions/download-artifact@v4
+        with:
+          name: cloud-light-wallet-kit
+          path: wallet-build
+          github-token: ${{ github.token }}
+          run-id: 40589172064
+      - name: Verify runtime sync, recovery and reopening
+        env:
+          ZINGO_NYM_PROXY: ${{ github.workspace }}/wallet-build/nym-proxy
+        run: |
+          sha256sum -c wallet-build/sha256.txt
+          chmod 700 wallet-build/zingo-cli wallet-build/nym-proxy
+          node --input-type=module <<'JS'
+          import {mkdtemp,rm} from 'node:fs/promises';
+          import {join,resolve} from 'node:path';
+          import {randomBytes} from 'node:crypto';
+          import {syncWalletCycle} from './src/light-wallet-worker.mjs';
+          const root=await mkdtemp(join(process.env.RUNNER_TEMP,'wallet-worker-'));
+          const password=randomBytes(32).toString('hex');
+          try{
+            for(let cycle=0;cycle<2;cycle++){
+              const status=await syncWalletCycle({root,password,binary:resolve('wallet-build/zingo-cli')});
+              console.log(JSON.stringify({cycle,...status}));
+            }
+          }finally{await rm(root,{recursive:true,force:true})}
+          JS
+      - name: Package verified executables only
+        run: |
+          sha256sum -c wallet-build/sha256.txt
+          test "$(cat wallet-build/source-commit.txt)" = bfb0a2156819ea7f75a9b09b1724abfd06c8925e
+          tar -C wallet-build -czf wallet-kit.tar.gz zingo-cli nym-proxy source-commit.txt
+          sha256sum wallet-kit.tar.gz > wallet-kit.tar.gz.sha256
+      - name: Publish pinned kit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create wallet-kit-bfb0a21-v1 --repo Cyano88/veildesk --title "Pinned testnet wallet kit" --notes "Zingo CLI and Nym proxy built from zingolabs/zingolib bfb0a2156819ea7f75a9b09b1724abfd06c8925e. Unfunded cloud sync verified. No wallet data included. Receipt verification remains pending." wallet-kit.tar.gz wallet-kit.tar.gz.sha256
