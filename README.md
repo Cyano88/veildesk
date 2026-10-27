@@ -2,6 +2,13 @@
 
 Private coordination for prediction-market agents. New standalone developer preview; PolyDesk remains an optional integration.
 
+Live on Render: [relay health](https://veildesk-relay.onrender.com/healthz).
+The API and provider run in the cloud with persistent disks. Enrolled clients can
+submit authenticated encrypted preview mandates and verify encrypted results.
+See [live deployment evidence](docs/render-live-2026-10-27.md). API access requires
+enrollment; this endpoint is not the browser demo. ZEC payments, trading and the
+OKX.AI listing remain disabled or pending.
+
 ## Run
 
 The relay/SDK package requires Node 24.14.x. No runtime dependencies.
