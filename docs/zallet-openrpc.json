@@ -1,0 +1,4561 @@
+{
+  "openrpc": "1.3.2",
+  "info": {
+    "title": "Zallet",
+    "description": "A prototype wallet. Don't rely on this for privacy or with significant funds yet!",
+    "version": "0.1.0-beta.3"
+  },
+  "methods": [
+    {
+      "name": "signmessage",
+      "summary": "Sign a message with the private key of a transparent address.",
+      "description": "Sign a message with the private key of a transparent address.\n\n# Arguments\n- `t_addr` (string, required): The transparent address to use to look up the private key that will be used to sign the message.\n- `message` (string, required): The message to create a signature of.",
+      "params": [
+        {
+          "name": "t_addr",
+          "summary": "The transparent address to use to look up the private key that will be used to sign the message.",
+          "description": "The transparent address to use to look up the private key that will be used to sign the message.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "message",
+          "summary": "The message to create a signature of.",
+          "description": "The message to create a signature of.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "signmessage_result",
+        "summary": "The result of signing a message.",
+        "description": "The result of signing a message.",
+        "schema": {
+          "$ref": "#/components/schemas/ResultType"
+        }
+      }
+    },
+    {
+      "name": "z_gettotalbalance",
+      "summary": "Returns the total value of funds stored in the node's wallet.",
+      "description": "Returns the total value of funds stored in the node's wallet.\n\nTODO: Currently watchonly addresses cannot be omitted; `include_watchonly` must be\nset to true.\n\n# Arguments\n\n- `minconf` (numeric, optional, default=1) Only include private and transparent\n  transactions confirmed at least this many times.\n- `include_watchonly` (bool, optional, default=false) Also include balance in\n  watchonly addresses (see 'importaddress' and 'z_importviewingkey').",
+      "params": [
+        {
+          "name": "minconf",
+          "summary": "Only include notes in transactions confirmed at least this many times.",
+          "description": "Only include notes in transactions confirmed at least this many times.",
+          "schema": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        {
+          "name": "include_watchonly",
+          "summary": "Also include balance in watchonly addresses.",
+          "description": "Also include balance in watchonly addresses.",
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "result": {
+        "name": "z_gettotalbalance_result",
+        "summary": "The total value of funds stored in the wallet.",
+        "description": "The total value of funds stored in the wallet.",
+        "schema": {
+          "$ref": "#/components/schemas/TotalBalance"
+        }
+      }
+    },
+    {
+      "name": "z_getoperationstatus",
+      "summary": "Get operation status and any associated result or error data.",
+      "description": "Get operation status and any associated result or error data.\n\nThe operation will remain in memory.\n\n- If the operation has failed, it will include an error object.\n- If the operation has succeeded, it will include the result value.\n- If the operation was cancelled, there will be no error object or result value.\n\n# Arguments\n- `operationid` (array, optional) A list of operation ids we are interested in.\n  If not provided, examine all operations known to the node.",
+      "params": [
+        {
+          "name": "operationid",
+          "summary": "A list of operation ids we are interested in.",
+          "description": "A list of operation ids we are interested in.",
+          "schema": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperationId"
+            }
+          }
+        }
+      ],
+      "result": {
+        "name": "z_getoperationstatus_result",
+        "summary": "The relevant operations.",
+        "description": "The relevant operations.",
+        "schema": {
+          "$ref": "#/components/schemas/ResultType2"
+        }
+      }
+    },
+    {
+      "name": "z_shieldcoinbase",
+      "summary": "Shields coinbase UTXOs from a single wallet-owned source into a",
+      "description": "Shields coinbase UTXOs from a single wallet-owned source into a\nshielded address.\n\nThis is an asynchronous operation; it returns an operation id that\ncan be used with `z_getoperationstatus` or `z_getoperationresult`.\n\n# Arguments\n- `fromaddress`: Either a single transparent address owned by this\n  wallet, or an account UUID (string) to sweep every coinbase UTXO\n  across that account's transparent receivers. Arrays of addresses\n  are not accepted; pass the account UUID instead if you need to\n  sweep across multiple receivers. Unlike `zcashd`, the wildcard\n  `\"*\"` (sweep all wallet t-addrs) is rejected with an\n  `InvalidParameter` error: cross-account sweeps would correlate\n  otherwise-unrelated accounts on-chain, so callers must scope the\n  sweep to a single account by passing its UUID.\n- `toaddress`: Any Zcash shielded address (Sapling, Orchard, or\n  Unified with a shielded receiver) that will receive the shielded\n  funds. Need not belong to this wallet. Transparent / TEX\n  destinations are rejected by the backend.\n- `fee` (numeric, optional): If set, it must be null. Zallet always\n  uses a fee calculated according to ZIP 317; the parameter is\n  accepted for positional compatibility with `zcashd`'s\n  `z_shieldcoinbase` only.\n- `limit` (numeric, optional): If supplied, caps the number of\n  selected coinbase UTXOs to the highest-value `n` of those\n  eligible. Recommended for wallets with many eligible coinbase\n  UTXOs: without it, a single transaction is built containing all\n  eligible UTXOs, which can exceed transaction-size limits at\n  broadcast time.\n- `memo` (string, optional): If supplied, stored in the memo field\n  of the resulting shielded payment. Hex-encoded, up to 1024 hex\n  characters (= 512 bytes).\n- `privacy_policy` (string, optional): Policy for what information\n  leakage is acceptable. Coinbase shielding always reveals the\n  source transparent address(es), so only two policy values are\n  accepted:\n  - `\"AllowRevealedSenders\"`: Allow revealing the source transparent\n    address. Sufficient when sweeping from a single t-addr.\n  - `\"AllowLinkingAccountAddresses\"`: Additionally allow linking\n    multiple source t-addrs on-chain. Required when sweeping from\n    an account UUID that expands to >1 transparent receiver with\n    eligible coinbase UTXOs.\n\n  When omitted or `null`, the default is chosen from `fromaddress`:\n  `\"AllowRevealedSenders\"` for a single t-addr, or\n  `\"AllowLinkingAccountAddresses\"` for an account UUID. Any other\n  policy name (including stricter values like `\"FullPrivacy\"` and\n  looser ones like `\"NoPrivacy\"`) is rejected.\n\n# Returns\nAn object matching `zcashd`'s `z_shieldcoinbase` shape:\n- `remainingUTXOs` (numeric): Eligible-but-not-selected coinbase UTXO\n  count.\n- `remainingValue` (numeric, ZEC): Total value of those UTXOs.\n- `shieldingUTXOs` (numeric): Number of coinbase UTXOs being\n  shielded by this operation.\n- `shieldingValue` (numeric, ZEC): Total value being shielded.\n- `opid` (string): Operation id.",
+      "params": [
+        {
+          "name": "fromaddress",
+          "summary": "Source of coinbase UTXOs to shield. Either a single transparent address owned by this wallet, or an account UUID to sweep every coinbase UTXO across that account's transparent receivers. Unlike `zcashd`, the wildcard `\"*\"` (sweep all wallet t-addrs) is rejected: scope the sweep to a single account by passing its UUID.",
+          "description": "Source of coinbase UTXOs to shield. Either a single transparent address owned by this wallet, or an account UUID to sweep every coinbase UTXO across that account's transparent receivers. Unlike `zcashd`, the wildcard `\"*\"` (sweep all wallet t-addrs) is rejected: scope the sweep to a single account by passing its UUID.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "toaddress",
+          "summary": "Any Zcash shielded address (Sapling, Orchard, or Unified with a shielded receiver) that will receive the shielded funds. Need not belong to this wallet. Transparent or TEX destinations are rejected.",
+          "description": "Any Zcash shielded address (Sapling, Orchard, or Unified with a shielded receiver) that will receive the shielded funds. Need not belong to this wallet. Transparent or TEX destinations are rejected.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "fee",
+          "summary": "If provided, must be null. Zallet always calculates and applies the ZIP-317 fee internally.",
+          "description": "If provided, must be null. Zallet always calculates and applies the ZIP-317 fee internally.",
+          "schema": true
+        },
+        {
+          "name": "limit",
+          "summary": "If supplied, caps the number of selected coinbase UTXOs to the highest-value `n` of those eligible. Recommended for wallets with many eligible coinbase UTXOs: without it, a single transaction is built containing all eligible UTXOs, which can exceed transaction-size limits at broadcast time.",
+          "description": "If supplied, caps the number of selected coinbase UTXOs to the highest-value `n` of those eligible. Recommended for wallets with many eligible coinbase UTXOs: without it, a single transaction is built containing all eligible UTXOs, which can exceed transaction-size limits at broadcast time.",
+          "schema": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        {
+          "name": "memo",
+          "summary": "If supplied, stored in the memo field of the resulting shielded payment. Must be a hex-encoded string (up to 1024 hex characters = 512 bytes).",
+          "description": "If supplied, stored in the memo field of the resulting shielded payment. Must be a hex-encoded string (up to 1024 hex characters = 512 bytes).",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "privacy_policy",
+          "summary": "Policy for what information leakage is acceptable. May be omitted or set to null to use a default chosen from `fromaddress`: `AllowRevealedSenders` when `fromaddress` is a single transparent address, `AllowLinkingAccountAddresses` when it is an account UUID. If provided explicitly, must be one of `AllowRevealedSenders` or `AllowLinkingAccountAddresses`; any other value is rejected. Coinbase shielding always reveals the source transparent address(es), so policies stricter than `AllowRevealedSenders` cannot be satisfied.",
+          "description": "Policy for what information leakage is acceptable. May be omitted or set to null to use a default chosen from `fromaddress`: `AllowRevealedSenders` when `fromaddress` is a single transparent address, `AllowLinkingAccountAddresses` when it is an account UUID. If provided explicitly, must be one of `AllowRevealedSenders` or `AllowLinkingAccountAddresses`; any other value is rejected. Coinbase shielding always reveals the source transparent address(es), so policies stricter than `AllowRevealedSenders` cannot be satisfied.",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "z_shieldcoinbase_result",
+        "summary": "The result of a `z_shieldcoinbase` pre-flight call.",
+        "description": "The result of a `z_shieldcoinbase` pre-flight call.\n\nMirrors the JSON object returned by `zcashd`'s `z_shieldcoinbase`:\n`{ remainingUTXOs, remainingValue, shieldingUTXOs, shieldingValue, opid }`.",
+        "schema": {
+          "$ref": "#/components/schemas/ShieldCoinbaseResult"
+        }
+      }
+    },
+    {
+      "name": "z_listoperationids",
+      "summary": "Returns the list of operation ids currently known to the wallet.",
+      "description": "Returns the list of operation ids currently known to the wallet.\n\n# Arguments\n- `status` (string, optional) Filter result by the operation's state e.g. \"success\".",
+      "params": [
+        {
+          "name": "status",
+          "summary": "Filter result by the operation's state e.g. \"success\".",
+          "description": "Filter result by the operation's state e.g. \"success\".",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "z_listoperationids_result",
+        "summary": "A list of operation IDs.",
+        "description": "A list of operation IDs.",
+        "schema": {
+          "$ref": "#/components/schemas/ResultType3"
+        }
+      }
+    },
+    {
+      "name": "listaddresses",
+      "summary": "Lists the addresses managed by this wallet by source.",
+      "description": "Lists the addresses managed by this wallet by source.\n\nSources include:\n- Addresses generated from randomness by a legacy `zcashd` wallet.\n- Sapling addresses generated from the legacy `zcashd` HD seed.\n- Imported watchonly transparent addresses.\n- Shielded addresses tracked using imported viewing keys.\n- Addresses derived from mnemonic seed phrases.\n\nIn the case that a source does not have addresses for a value pool, the key\nassociated with that pool will be absent.\n\nREMINDER: It is recommended that you back up your wallet files regularly. If you\nhave not imported externally-produced keys, it only necessary to have backed up\nthe wallet's key storage file.",
+      "params": [],
+      "result": {
+        "name": "listaddresses_result",
+        "summary": "A list of address sources.",
+        "description": "A list of address sources.",
+        "schema": {
+          "$ref": "#/components/schemas/ResultType4"
+        }
+      }
+    },
+    {
+      "name": "verifymessage",
+      "summary": "Verify a signed message.",
+      "description": "Verify a signed message.\n\n# Arguments\n- `zcashaddress` (string, required): The Zcash transparent address used to sign the message.\n- `signature` (string, required): The signature provided by the signer in base64 encoding.\n- `message` (string, required): The message that was signed.",
+      "params": [
+        {
+          "name": "zcashaddress",
+          "summary": "The zcash transparent address to use for the signature.",
+          "description": "The zcash transparent address to use for the signature.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "signature",
+          "summary": "The signature provided by the signer in base64 encoding.",
+          "description": "The signature provided by the signer in base64 encoding.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "message",
+          "summary": "The message that was signed.",
+          "description": "The message that was signed.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "verifymessage_result",
+        "summary": "The result of verifying a message signature.",
+        "description": "The result of verifying a message signature.",
+        "schema": {
+          "$ref": "#/components/schemas/ResultType5"
+        }
+      }
+    },
+    {
+      "name": "decoderawtransaction",
+      "summary": "Return a JSON object representing the serialized, hex-encoded transaction.",
+      "description": "Return a JSON object representing the serialized, hex-encoded transaction.\n\n# Arguments\n- `hexstring` (string, required) The transaction hex string.",
+      "params": [
+        {
+          "name": "hexstring",
+          "summary": "The transaction hex string",
+          "description": "The transaction hex string",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "decoderawtransaction_result",
+        "summary": "Verbose information about a transaction.",
+        "description": "Verbose information about a transaction.",
+        "schema": {
+          "$ref": "#/components/schemas/TransactionDetails"
+        }
+      }
+    },
+    {
+      "name": "getwalletstatus",
+      "summary": "Returns wallet status information.",
+      "description": "Returns wallet status information.",
+      "params": [],
+      "result": {
+        "name": "getwalletstatus_result",
+        "summary": "The wallet status information.",
+        "description": "The wallet status information.",
+        "schema": {
+          "$ref": "#/components/schemas/GetWalletStatus"
+        }
+      }
+    },
+    {
+      "name": "z_importviewingkey",
+      "summary": "Imports a Sapling viewing key into the wallet.",
+      "description": "Imports a Sapling viewing key into the wallet.\n\nOnly Sapling extended full viewing keys are supported. The wallet will track\nincoming and outgoing transactions for addresses derived from this key, but\nwill not have spending authority.\n\n# Arguments\n\n- `vkey` (string, required) The viewing key (see `z_exportviewingkey`).\n- `rescan` (string, optional, default=\"whenkeyisnew\") Whether to rescan the\n  blockchain for transactions (\"yes\", \"no\", or \"whenkeyisnew\"). When rescan is\n  enabled, the wallet's background sync engine will scan for historical\n  transactions from the given start height.\n- `startHeight` (numeric, optional, default=0) Block height from which to begin\n  the rescan. Only used when rescan is \"yes\" or \"whenkeyisnew\" (for a new key).",
+      "params": [
+        {
+          "name": "vkey",
+          "summary": "The viewing key (only Sapling extended full viewing keys are supported).",
+          "description": "The viewing key (only Sapling extended full viewing keys are supported).",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "rescan",
+          "summary": "Whether to rescan the blockchain for transactions (\"yes\", \"no\", or \"whenkeyisnew\"; default is \"whenkeyisnew\"). When rescan is enabled, the wallet's background sync engine will scan for historical transactions from the given start height.",
+          "description": "Whether to rescan the blockchain for transactions (\"yes\", \"no\", or \"whenkeyisnew\"; default is \"whenkeyisnew\"). When rescan is enabled, the wallet's background sync engine will scan for historical transactions from the given start height.",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "start_height",
+          "summary": "Block height from which to begin the rescan (default is 0). Only used when rescan is \"yes\" or \"whenkeyisnew\" (for a new key).",
+          "description": "Block height from which to begin the rescan (default is 0). Only used when rescan is \"yes\" or \"whenkeyisnew\" (for a new key).",
+          "schema": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          }
+        }
+      ],
+      "result": {
+        "name": "z_importviewingkey_result",
+        "summary": "Result of importing a viewing key.",
+        "description": "Result of importing a viewing key.",
+        "schema": {
+          "$ref": "#/components/schemas/ResultType6"
+        }
+      }
+    },
+    {
+      "name": "z_getnotescount",
+      "summary": "Returns the number of notes available in the wallet for each shielded value pool.",
+      "description": "Returns the number of notes available in the wallet for each shielded value pool.\n\n# Arguments\n- `minconf`: Only include notes in transactions confirmed at least this many times\n  (default = 1). Must be at least 1 when `as_of_height` is provided.\n- `as_of_height`: Execute the query as if it were run when the blockchain was at the height\n  specified by this argument. The default is to use the entire blockchain that the node is\n  aware of. -1 can be used as in other RPC calls to indicate the current height (including\n  the mempool), but this does not support negative values in general. A \u201cfuture\u201d height will\n  fall back to the current height.",
+      "params": [
+        {
+          "name": "minconf",
+          "summary": "Only include notes in transactions confirmed at least this many times.",
+          "description": "Only include notes in transactions confirmed at least this many times.",
+          "schema": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        {
+          "name": "as_of_height",
+          "summary": "Execute the query as if it were run when the blockchain was at the height specified by this argument.",
+          "description": "Execute the query as if it were run when the blockchain was at the height specified by this argument.",
+          "schema": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      ],
+      "result": {
+        "name": "z_getnotescount_result",
+        "summary": "The number of notes in the wallet.",
+        "description": "The number of notes in the wallet.",
+        "schema": {
+          "$ref": "#/components/schemas/GetNotesCount"
+        }
+      }
+    },
+    {
+      "name": "z_exportviewingkey",
+      "summary": "Reveals the viewing key corresponding to 'zaddr'.",
+      "description": "Reveals the viewing key corresponding to 'zaddr'.\n\n# Arguments\n\n- `zaddr` (string, required) The Sapling payment address or unified\n  address.\n- `ivk` (boolean, optional, default=`false`) When `true`, export the\n  unified incoming viewing key (UIVK) for the account holding `zaddr`\n  instead of the full viewing key.\n\n# Returns\nA string containing the viewing key:\n- For a Sapling payment address, the Sapling extended full viewing key\n  (`zxviews\u2026`).\n- For a unified address, the unified full viewing key (`uview\u2026`) of the\n  account holding the address.\n- When `ivk` is `true`, the unified incoming viewing key (`uivk\u2026`) of\n  the account holding the address, for either address kind. Note that\n  a UIVK grants incoming viewing capability for every pool in the\n  account, even when `zaddr` is a Sapling address.",
+      "params": [
+        {
+          "name": "zaddr",
+          "summary": "The Sapling payment address or unified address.",
+          "description": "The Sapling payment address or unified address.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "ivk",
+          "summary": "Whether to export the unified incoming viewing key (UIVK) instead of the full viewing key. Default is false.",
+          "description": "Whether to export the unified incoming viewing key (UIVK) instead of the full viewing key. Default is false.",
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "result": {
+        "name": "z_exportviewingkey_result",
+        "summary": "The exported viewing key, as a bech32- or bech32m-encoded string.",
+        "description": "The exported viewing key, as a bech32- or bech32m-encoded string.",
+        "schema": {
+          "$ref": "#/components/schemas/ResultType7"
+        }
+      }
+    },
+    {
+      "name": "z_listunspent",
+      "summary": "Returns an array of unspent shielded notes with between minconf and maxconf",
+      "description": "Returns an array of unspent shielded notes with between minconf and maxconf\n(inclusive) confirmations.\n\nResults may be optionally filtered to only include notes sent to specified\naddresses. When `minconf` is 0, unspent notes with zero confirmations are\nreturned, even though they are not immediately spendable.\n\n# Arguments\n- `minconf`: Select outputs with at least this many confirmations (default = 1). Must be at\n  least 1 when `as_of_height` is provided.\n- `maxconf`: Select outputs with at most this many confirmations (default = unlimited).\n- `include_watchonly`: Include notes/utxos for which the wallet does not provide spending\n  capability (default = false).\n- `addresses`: A list of addresses for which to retrieve UTXOs. For shielded addresses that\n  correspond to a unified account, unspent notes belonging to that account are returned\n  irrespective of whether the provided address's diversifier corresponds to the diversifier\n  of the address that received the funds. If this parameter is omitted or empty, all notes\n  are returned, irrespective of account. (default = None)\n- `as_of_height`: Execute the query as if it were run when the blockchain was at the height\n  specified by this argument. The default is to use the entire blockchain that the node is\n  aware of. -1 can be used as in other RPC calls to indicate the current height (including\n  the mempool), but this does not support negative values in general. A \u201cfuture\u201d height will\n  fall back to the current height.",
+      "params": [
+        {
+          "name": "minconf",
+          "summary": "Only include outputs of transactions confirmed at least this many times.",
+          "description": "Only include outputs of transactions confirmed at least this many times.",
+          "schema": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        {
+          "name": "maxconf",
+          "summary": "Only include outputs of transactions confirmed at most this many times.",
+          "description": "Only include outputs of transactions confirmed at most this many times.",
+          "schema": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        {
+          "name": "include_watchonly",
+          "summary": "Also include outputs received at watch-only addresses.",
+          "description": "Also include outputs received at watch-only addresses.",
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "addresses",
+          "summary": "If non-empty, only outputs received by the provided addresses will be returned.",
+          "description": "If non-empty, only outputs received by the provided addresses will be returned.",
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "name": "as_of_height",
+          "summary": "Execute the query as if it were run when the blockchain was at the height specified by this argument.",
+          "description": "Execute the query as if it were run when the blockchain was at the height specified by this argument.",
+          "schema": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      ],
+      "result": {
+        "name": "z_listunspent_result",
+        "summary": "A list of unspent notes.",
+        "description": "A list of unspent notes.",
+        "schema": {
+          "$ref": "#/components/schemas/ResultType8"
+        }
+      }
+    },
+    {
+      "name": "z_importaddress",
+      "summary": "Imports a transparent address into the wallet for a given account.",
+      "description": "Imports a transparent address into the wallet for a given account.\n\nThe hex data can be either:\n- A compressed or uncompressed public key (imports as P2PKH).\n- A redeem script (imports as P2SH).\n\nReturns the type of address imported and the corresponding transparent address.\n\n# Arguments\n- `account` (string, required) The account UUID.\n- `hex_data` (string, required) Hex-encoded public key or redeem script.\n- `rescan` (boolean, optional, default=true) If true, rescan the chain for UTXOs\n  belonging to all wallet transparent addresses after importing.",
+      "params": [
+        {
+          "name": "account",
+          "summary": "The account UUID to import the address into.",
+          "description": "The account UUID to import the address into.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "hex_data",
+          "summary": "Hex-encoded public key (P2PKH) or redeem script (P2SH).",
+          "description": "Hex-encoded public key (P2PKH) or redeem script (P2SH).",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "rescan",
+          "summary": "If true (default), rescan the chain for UTXOs belonging to all wallet transparent addresses.",
+          "description": "If true (default), rescan the chain for UTXOs belonging to all wallet transparent addresses.",
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "result": {
+        "name": "z_importaddress_result",
+        "summary": "The result of importing an address.",
+        "description": "The result of importing an address.",
+        "schema": {
+          "$ref": "#/components/schemas/ResultType9"
+        }
+      }
+    },
+    {
+      "name": "z_listunifiedreceivers",
+      "summary": "Returns a record of the individual receivers contained within the provided UA,",
+      "description": "Returns a record of the individual receivers contained within the provided UA,\nkeyed by receiver type. The UA may not have receivers for some receiver types,\nin which case those keys will be absent.\n\nTransactions that send funds to any of the receivers returned by this RPC\nmethod will be detected by the wallet as having been sent to the unified\naddress.\n\n# Arguments\n- `unified_address` (string, required) The unified address to inspect.",
+      "params": [
+        {
+          "name": "unified_address",
+          "summary": "The unified address to inspect.",
+          "description": "The unified address to inspect.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "z_listunifiedreceivers_result",
+        "summary": "The receivers within a unified address.",
+        "description": "The receivers within a unified address.",
+        "schema": {
+          "$ref": "#/components/schemas/ListUnifiedReceivers"
+        }
+      }
+    },
+    {
+      "name": "z_getaddressforaccount",
+      "summary": "For the given account, derives a Unified Address in accordance with the remaining",
+      "description": "For the given account, derives a Unified Address in accordance with the remaining\narguments:\n\n- If no list of receiver types is given (or the empty list `[]`), the best and\n  second-best shielded receiver types, along with the \"p2pkh\" (i.e. transparent)\n  receiver type, will be used.\n- If no diversifier index is given, then:\n  - If a transparent receiver would be included (either because no list of\n    receiver types is given, or the provided list includes \"p2pkh\"), the next\n    unused index (that is valid for the list of receiver types) will be selected.\n  - If only shielded receivers would be included (because a list of receiver types\n    is given that does not include \"p2pkh\"), a time-based index will be selected.\n\nThe account parameter must be a UUID or account number that was previously\ngenerated by a call to the `z_getnewaccount` RPC method. The legacy account number\nis only supported for wallets containing a single seed phrase.\n\nOnce a Unified Address has been derived at a specific diversifier index,\nre-deriving it (via a subsequent call to `z_getaddressforaccount` with the same\naccount and index) will produce the same address with the same list of receiver\ntypes. An error will be returned if a different list of receiver types is\nrequested, including when the empty list `[]` is provided (if the default receiver\ntypes don't match).",
+      "params": [
+        {
+          "name": "account",
+          "summary": "Either the UUID or ZIP 32 account index of the account to derive from.",
+          "description": "Either the UUID or ZIP 32 account index of the account to derive from.",
+          "required": true,
+          "schema": true
+        },
+        {
+          "name": "receiver_types",
+          "summary": "Receiver types to include in the derived address.",
+          "description": "Receiver types to include in the derived address.",
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "name": "diversifier_index",
+          "summary": "A specific diversifier index to derive at.",
+          "description": "A specific diversifier index to derive at.",
+          "schema": {
+            "type": "integer",
+            "format": "uint128",
+            "minimum": 0
+          }
+        }
+      ],
+      "result": {
+        "name": "z_getaddressforaccount_result",
+        "summary": "Information about a derived Unified Address.",
+        "description": "Information about a derived Unified Address.",
+        "schema": {
+          "$ref": "#/components/schemas/Address"
+        }
+      }
+    },
+    {
+      "name": "pczt_combine",
+      "summary": "Combines multiple PCZTs (for the same transaction) into one.",
+      "description": "Combines multiple PCZTs (for the same transaction) into one.\n\nThis applies the Combiner role, merging the per-party contributions\n(proofs and signatures produced in parallel) into a single PCZT.\n\n# Arguments\n- `pczts` (array, required) The base64-encoded PCZTs to combine.",
+      "params": [
+        {
+          "name": "pczts",
+          "summary": "An array of base64-encoded PCZTs to combine.",
+          "description": "An array of base64-encoded PCZTs to combine.",
+          "required": true,
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      ],
+      "result": {
+        "name": "pczt_combine_result",
+        "summary": "Result containing the combined PCZT.",
+        "description": "Result containing the combined PCZT.",
+        "schema": {
+          "$ref": "#/components/schemas/CombineResult"
+        }
+      }
+    },
+    {
+      "name": "z_listaccounts",
+      "summary": "Returns the list of accounts created with `z_getnewaccount` or `z_recoveraccounts`.",
+      "description": "Returns the list of accounts created with `z_getnewaccount` or `z_recoveraccounts`.\n\n# Arguments\n- `include_addresses` (bool, optional, default=true) Also include the addresses\n  known to the wallet for this account.",
+      "params": [
+        {
+          "name": "include_addresses",
+          "summary": "Also include the addresses known to the wallet for this account.",
+          "description": "Also include the addresses known to the wallet for this account.",
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "result": {
+        "name": "z_listaccounts_result",
+        "summary": "A list of accounts.",
+        "description": "A list of accounts.",
+        "schema": {
+          "$ref": "#/components/schemas/ResultType10"
+        }
+      }
+    },
+    {
+      "name": "stop",
+      "summary": "Stop the running zallet process.",
+      "description": "Stop the running zallet process.\n\n# Notes\n\n- Works for non windows targets only.\n- Works only if the network of the running zallet process is `Regtest`.",
+      "params": [],
+      "result": {
+        "name": "stop_result",
+        "summary": "The stop response.",
+        "description": "The stop response.",
+        "schema": {
+          "$ref": "#/components/schemas/ResultType11"
+        }
+      }
+    },
+    {
+      "name": "pczt_extract",
+      "summary": "Extracts the final, network-ready transaction from a completed PCZT.",
+      "description": "Extracts the final, network-ready transaction from a completed PCZT.\n\nFinalizes the transparent spends and verifies the shielded proofs and\nsignatures before returning the hex-encoded transaction. Fails if the\nPCZT is not fully proven and signed. Transparent script signatures are\nnot executed here; an invalid one surfaces at broadcast.\n\nIf this wallet created the PCZT, the transaction is also recorded in the\nwallet database so its inputs are tracked as pending-spent.\n\n# Arguments\n- `pczt` (string, required) The base64-encoded PCZT to extract from.",
+      "params": [
+        {
+          "name": "pczt",
+          "summary": "The base64-encoded PCZT to extract a final transaction from.",
+          "description": "The base64-encoded PCZT to extract a final transaction from.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "pczt_extract_result",
+        "summary": "Result containing the extracted transaction.",
+        "description": "Result containing the extracted transaction.",
+        "schema": {
+          "$ref": "#/components/schemas/ExtractResult"
+        }
+      }
+    },
+    {
+      "name": "z_getbalances",
+      "summary": "Returns the balances available for each independent spending authority held by the",
+      "description": "Returns the balances available for each independent spending authority held by the\nwallet, and optionally the balances and received amounts associated with imported\nwatch-only addresses and viewing keys.\n\nThis includes funds held by each HD-derived Unified Account in the wallet,\nspending keys imported with `z_importkey`, and (if enabled) the legacy transparent\npool of funds.\n\n# Arguments\n\n- `minconf` (numeric, optional, default=1) Only include unspent outputs in\n  transactions confirmed at least this many times.",
+      "params": [
+        {
+          "name": "minconf",
+          "summary": "Only include unspent outputs in transactions confirmed at least this many times.",
+          "description": "Only include unspent outputs in transactions confirmed at least this many times.",
+          "schema": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        }
+      ],
+      "result": {
+        "name": "z_getbalances_result",
+        "summary": "The balances available for each independent spending authority held by the wallet.",
+        "description": "The balances available for each independent spending authority held by the wallet.",
+        "schema": {
+          "$ref": "#/components/schemas/Balances"
+        }
+      }
+    },
+    {
+      "name": "walletlock",
+      "summary": "Removes the wallet encryption key from memory, locking the wallet.",
+      "description": "Removes the wallet encryption key from memory, locking the wallet.\n\nAfter calling this method, you will need to call `walletpassphrase` again before\nbeing able to call any methods which require the wallet to be unlocked.",
+      "params": [],
+      "result": {
+        "name": "walletlock_result",
+        "summary": "Empty result indicating success.",
+        "description": "Empty result indicating success.",
+        "schema": {
+          "$ref": "#/components/schemas/ResultType12"
+        }
+      }
+    },
+    {
+      "name": "z_getnewaccount",
+      "summary": "Prepares and returns a new account.",
+      "description": "Prepares and returns a new account.\n\nIf the wallet contains more than one UA-compatible HD seed phrase, the `seedfp`\nargument must be provided. Available seed fingerprints can be found in the output\nof the `listaddresses` RPC method.\n\nWithin a UA-compatible HD seed phrase, accounts are numbered starting from zero;\nthis RPC method selects the next available sequential account number.\n\nEach new account is a separate group of funds within the wallet, and adds an\nadditional performance cost to wallet scanning.\n\nUse the `z_getaddressforaccount` RPC method to obtain addresses for an account.",
+      "params": [
+        {
+          "name": "account_name",
+          "summary": "A human-readable name for the account.",
+          "description": "A human-readable name for the account.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "seedfp",
+          "summary": "ZIP 32 seed fingerprint for the BIP 39 mnemonic phrase from which to derive the account.",
+          "description": "ZIP 32 seed fingerprint for the BIP 39 mnemonic phrase from which to derive the account.",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "z_getnewaccount_result",
+        "summary": "Information about the new account.",
+        "description": "Information about the new account.",
+        "schema": {
+          "$ref": "#/components/schemas/Account2"
+        }
+      }
+    },
+    {
+      "name": "z_importkey",
+      "summary": "Imports a spending key into the wallet.",
+      "description": "Imports a spending key into the wallet.\n\nOnly Sapling extended spending keys are supported.\n\n# Arguments\n\n- `key` (string, required) The spending key to import.\n- `rescan` (string, optional, default=\"whenkeyisnew\") Whether to rescan the\n  blockchain for transactions (\"yes\", \"no\", or \"whenkeyisnew\"). When rescan is\n  enabled, the wallet's background sync engine will scan for historical\n  transactions from the given start height.\n- `startHeight` (numeric, optional, default=0) Block height from which to begin\n  the rescan. Only used when rescan is \"yes\" or \"whenkeyisnew\" (for a new key).",
+      "params": [
+        {
+          "name": "key",
+          "summary": "The spending key (only Sapling extended spending keys are supported).",
+          "description": "The spending key (only Sapling extended spending keys are supported).",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "rescan",
+          "summary": "Whether to rescan the blockchain for transactions (\"yes\", \"no\", or \"whenkeyisnew\"; default is \"whenkeyisnew\"). When rescan is enabled, the wallet's background sync engine will scan for historical transactions from the given start height.",
+          "description": "Whether to rescan the blockchain for transactions (\"yes\", \"no\", or \"whenkeyisnew\"; default is \"whenkeyisnew\"). When rescan is enabled, the wallet's background sync engine will scan for historical transactions from the given start height.",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "start_height",
+          "summary": "Block height from which to begin the rescan (default is 0). Only used when rescan is \"yes\" or \"whenkeyisnew\" (for a new key).",
+          "description": "Block height from which to begin the rescan (default is 0). Only used when rescan is \"yes\" or \"whenkeyisnew\" (for a new key).",
+          "schema": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          }
+        }
+      ],
+      "result": {
+        "name": "z_importkey_result",
+        "summary": "Result of importing a spending key.",
+        "description": "Result of importing a spending key.",
+        "schema": {
+          "$ref": "#/components/schemas/ResultType13"
+        }
+      }
+    },
+    {
+      "name": "getrawtransaction",
+      "summary": "Returns the raw transaction data for the given transaction ID.",
+      "description": "Returns the raw transaction data for the given transaction ID.\n\nNOTE: If `blockhash` is provided, only that block will be searched, and if the\ntransaction is in the mempool or other blocks, or if the node backing this wallet\ndoes not have the given block available, the transaction will not be found.\n\n# Arguments\n- `txid` (string, required) The transaction ID.\n- `verbose` (numeric, optional, default=0) If 0, return a string of hex-encoded\n  data. If non-zero, return a JSON object with information about `txid`.\n- `blockhash` (string, optional) The block in which to look for the transaction.",
+      "params": [
+        {
+          "name": "txid",
+          "summary": "The ID of the transaction to fetch.",
+          "description": "The ID of the transaction to fetch.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "verbose",
+          "summary": "If 0, return a string of hex-encoded data. If non-zero, return a JSON object with information about `txid`",
+          "description": "If 0, return a string of hex-encoded data. If non-zero, return a JSON object with information about `txid`",
+          "schema": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          }
+        },
+        {
+          "name": "blockhash",
+          "summary": "The block in which to look for the transaction.",
+          "description": "The block in which to look for the transaction.",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "getrawtransaction_result",
+        "summary": "The `getrawtransaction` response.",
+        "description": "The `getrawtransaction` response.",
+        "schema": {
+          "$ref": "#/components/schemas/ResultType14"
+        }
+      }
+    },
+    {
+      "name": "z_recoveraccounts",
+      "summary": "Tells the wallet to track specific accounts.",
+      "description": "Tells the wallet to track specific accounts.\n\nReturns the UUIDs within this Zallet instance of the newly-tracked accounts.\nAccounts that are already tracked by the wallet are ignored.\n\nAfter calling this method, a subsequent call to `z_getnewaccount` will add the\nfirst account with index greater than all indices provided here for the\ncorresponding `seedfp` (as well as any already tracked by the wallet).\n\nEach tracked account is a separate group of funds within the wallet, and adds an\nadditional performance cost to wallet scanning.\n\nUse the `z_getaddressforaccount` RPC method to obtain addresses for an account.\n\n# Arguments\n\n- `accounts` (array, required) An array of JSON objects representing the accounts\n  to recover, with the following fields:\n  - `name` (string, required)\n  - `seedfp` (string, required) The seed fingerprint for the mnemonic phrase from\n    which the account is derived. Available seed fingerprints can be found in the\n    output of the `listaddresses` RPC method.\n  - `zip32_account_index` (numeric, required)\n  - `birthday_height` (numeric, required)",
+      "params": [
+        {
+          "name": "accounts",
+          "summary": "An array of JSON objects representing the accounts to recover.",
+          "description": "An array of JSON objects representing the accounts to recover.",
+          "required": true,
+          "schema": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccountParameter"
+            }
+          }
+        }
+      ],
+      "result": {
+        "name": "z_recoveraccounts_result",
+        "summary": "The list of recovered accounts.",
+        "description": "The list of recovered accounts.",
+        "schema": {
+          "$ref": "#/components/schemas/Accounts"
+        }
+      }
+    },
+    {
+      "name": "pczt_prove",
+      "summary": "Adds the zero-knowledge proofs required by a PCZT.",
+      "description": "Adds the zero-knowledge proofs required by a PCZT.\n\nCreates the Sapling, Orchard, and/or Ironwood proofs for the PCZT's\nshielded components. This must be done before the transaction can be\nextracted.\n\nThe first call for each circuit version generates and caches the proving\nkey, which can take tens of seconds and may exceed the RPC timeout; the\nwork completes in the background and a retry reuses the cached key. When\nthe RPC server starts, the keys for the current consensus branch are\nwarmed in the background, so in steady state this cost is paid before\nthe first call arrives.\n\n# Arguments\n- `pczt` (string, required) The base64-encoded PCZT to add proofs to.",
+      "params": [
+        {
+          "name": "pczt",
+          "summary": "The base64-encoded PCZT to add proofs to.",
+          "description": "The base64-encoded PCZT to add proofs to.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "pczt_prove_result",
+        "summary": "Result of proving a PCZT.",
+        "description": "Result of proving a PCZT.",
+        "schema": {
+          "$ref": "#/components/schemas/ProveResult"
+        }
+      }
+    },
+    {
+      "name": "getwalletinfo",
+      "summary": "Returns wallet state information.",
+      "description": "Returns wallet state information.",
+      "params": [],
+      "result": {
+        "name": "getwalletinfo_result",
+        "summary": "The wallet state information.",
+        "description": "The wallet state information.",
+        "schema": {
+          "$ref": "#/components/schemas/GetWalletInfo"
+        }
+      }
+    },
+    {
+      "name": "z_sendfromaccount",
+      "summary": "Sends funds from an account in one shot, signing and broadcasting the",
+      "description": "Sends funds from an account in one shot, signing and broadcasting the\ntransaction.\n\nUnlike `z_sendmany`, the source of funds is an account UUID together\nwith an explicit fund source, rather than an address. The transaction is\nassembled through the same pipeline as the `pczt_*` methods (create,\nprove, sign, extract); use those methods directly to inspect a\ntransaction before executing it. Unlike `z_sendmany`, the call completes\nsynchronously, returning the txid rather than an operation id.\n\n# Arguments\n- `account` (string, required) The UUID of the account to send the funds\n  from.\n- `fund_source` (string or array, required) Where funds may be drawn\n  from. One of the strings `\"orchard\"`, `\"sapling\"`,\n  `\"any_transparent\"`, or an array of transparent address strings. Each\n  source is isolating: a source that cannot cover the payment reports\n  insufficient funds rather than drawing on the account's other funds.\n  `\"orchard\"` includes the Ironwood pool, where an account's\n  Orchard-receiver funds are held once NU6.3 activates.\n- `recipients` (array, required) An array of JSON objects representing\n  the amounts to send, with the same shape as `z_sendmany`'s `amounts`.\n- `minconf` (numeric, optional) Only use funds confirmed at least this\n  many times.\n- `privacy_policy` (string, required) Policy for what information\n  leakage is acceptable, using the same values as `z_sendmany`.\n  Required: the send is not proposed for review first, so the caller\n  must acknowledge its privacy implications up front.",
+      "params": [
+        {
+          "name": "account",
+          "summary": "The UUID of the account to send the funds from.",
+          "description": "The UUID of the account to send the funds from.",
+          "required": true,
+          "schema": true
+        },
+        {
+          "name": "fund_source",
+          "summary": "Where funds may be drawn from: \"orchard\", \"sapling\", \"any_transparent\", or an array of transparent addresses.",
+          "description": "Where funds may be drawn from: \"orchard\", \"sapling\", \"any_transparent\", or an array of transparent addresses.",
+          "required": true,
+          "schema": true
+        },
+        {
+          "name": "recipients",
+          "summary": "An array of JSON objects representing the amounts to send.",
+          "description": "An array of JSON objects representing the amounts to send.",
+          "required": true,
+          "schema": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AmountParameter"
+            }
+          }
+        },
+        {
+          "name": "minconf",
+          "summary": "Only use funds confirmed at least this many times.",
+          "description": "Only use funds confirmed at least this many times.",
+          "schema": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        {
+          "name": "privacy_policy",
+          "summary": "Policy for what information leakage is acceptable.",
+          "description": "Policy for what information leakage is acceptable.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "z_sendfromaccount_result",
+        "summary": "The result of sending a payment.",
+        "description": "The result of sending a payment.",
+        "schema": {
+          "$ref": "#/components/schemas/SendResult"
+        }
+      }
+    },
+    {
+      "name": "z_sendmany",
+      "summary": "Send a transaction with multiple recipients.",
+      "description": "Send a transaction with multiple recipients.\n\nThis is an async operation; it returns an operation ID string that you can pass to\n`z_getoperationstatus` or `z_getoperationresult`.\n\nAmounts are decimal numbers with at most 8 digits of precision.\n\nChange generated from one or more transparent addresses flows to a new transparent\naddress, while change generated from a legacy Sapling address returns to itself.\nTODO: <https://github.com/zcash/zallet/issues/138>\n\nWhen sending from a unified address, change is returned to the internal-only\naddress for the associated unified account.\n\nWhen spending coinbase UTXOs, only shielded recipients are permitted and change is\nnot allowed; the entire value of the coinbase UTXO(s) must be consumed.\nTODO: <https://github.com/zcash/zallet/issues/137>\n\n# Arguments\n\n- `fromaddress` (string, required) The transparent or shielded address to send the\n  funds from. The following special strings are also accepted:\n  - `\"ANY_TADDR\"`: Select non-coinbase UTXOs from any transparent address in the\n    legacy `zcashd` pool of funds. This requires\n    `features.legacy_pool_seed_fingerprint` to be set in the Zallet config file to\n    the seed fingerprint of the `zcashd` wallet that was migrated into this wallet;\n    without it there is no legacy pool to spend from and the call is rejected.\n    Covering the payment from more than one of the pool's addresses links them\n    on-chain, so such a call requires a privacy policy of\n    `AllowLinkingAccountAddresses` (or of `NoPrivacy`, if it also has a transparent\n    recipient or transparent change). Use `z_shieldcoinbase` to shield coinbase\n    UTXOs from multiple transparent addresses.\n  If a unified address is provided for this argument, the TXOs to be spent will be\n  selected from those associated with the account corresponding to that unified\n  address, from value pools corresponding to the receivers included in the UA.\n- `amounts` (array, required) An array of JSON objects representing the amounts to\n  send, with the following fields:\n  - `address` (string, required) A taddr, zaddr, or Unified Address.\n  - `amount` (numeric, required) The numeric amount in ZEC.\n  - `memo` (string, optional) If the address is a zaddr, raw data represented in\n    hexadecimal string format. If the output is being sent to a transparent\n    address, it\u2019s an error to include this field.\n- `minconf` (numeric, optional) Only use funds confirmed at least this many times.\n- `fee` (numeric, optional) If set, it must be null. Zallet always uses a fee\n  calculated according to ZIP 317.\n- `privacy_policy` (string, optional, default=`\"FullPrivacy\"`) Policy for what\n  information leakage is acceptable. One of the following strings:\n  - `\"FullPrivacy\"`: Only allow fully-shielded transactions (involving a single\n    shielded value pool).\n  - `\"AllowRevealedAmounts\"`: Allow funds to cross between shielded value pools,\n    revealing the amount that crosses pools.\n  - `\"AllowRevealedRecipients\"`: Allow transparent recipients. This also implies\n    revealing information described under `\"AllowRevealedAmounts\"`.\n  - `\"AllowRevealedSenders\"`: Allow transparent funds to be spent, revealing the\n    sending addresses and amounts. This implies revealing information described\n    under `\"AllowRevealedAmounts\"`.\n  - `\"AllowFullyTransparent\"`: Allow transaction to both spend transparent funds\n    and have transparent recipients. This implies revealing information described\n    under `\"AllowRevealedSenders\"` and `\"AllowRevealedRecipients\"`.\n  - `\"AllowLinkingAccountAddresses\"`: Allow selecting transparent coins from the\n    full account, rather than just the funds sent to the transparent receiver in\n    the provided Unified Address. This implies revealing information described\n    under `\"AllowRevealedSenders\"`.\n  - `\"NoPrivacy\"`: Allow the transaction to reveal any information necessary to\n    create it. This implies revealing information described under\n    `\"AllowFullyTransparent\"` and `\"AllowLinkingAccountAddresses\"`.",
+      "params": [
+        {
+          "name": "fromaddress",
+          "summary": "The transparent or shielded address to send the funds from.",
+          "description": "The transparent or shielded address to send the funds from.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "amounts",
+          "summary": "An array of JSON objects representing the amounts to send.",
+          "description": "An array of JSON objects representing the amounts to send.",
+          "required": true,
+          "schema": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AmountParameter"
+            }
+          }
+        },
+        {
+          "name": "minconf",
+          "summary": "Only use funds confirmed at least this many times.",
+          "description": "Only use funds confirmed at least this many times.",
+          "schema": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        {
+          "name": "fee",
+          "summary": "If set, it must be null.",
+          "description": "If set, it must be null.",
+          "schema": true
+        },
+        {
+          "name": "privacy_policy",
+          "summary": "Policy for what information leakage is acceptable.",
+          "description": "Policy for what information leakage is acceptable.",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "z_sendmany_result",
+        "summary": "An async operation ID.",
+        "description": "An async operation ID.",
+        "schema": {
+          "$ref": "#/components/schemas/OperationId"
+        }
+      }
+    },
+    {
+      "name": "pczt_create",
+      "summary": "Creates a PCZT from a transaction proposal.",
+      "description": "Creates a PCZT from a transaction proposal.\n\nSelects inputs and computes change for the given recipients, producing a\ncomplete (but unproven and unsigned) PCZT. This is the PCZT-based\nreplacement for `createrawtransaction` and `fundrawtransaction`.\n\nThe result reports the minimum privacy policy the transaction requires,\nwhich `pczt_sign` will ask the caller to acknowledge. To see what a\ntransaction would reveal before committing to it, create it with the\n`NoPrivacy` policy and inspect the reported requirement.\n\nA PCZT holds a single transaction, so payments that take more than one\nare not supported: a ZIP 320 (TEX) recipient must be paid with\n`z_sendmany`, which performs both steps.\n\n# Arguments\n- `from` (string, required) The address, or the account UUID, to send\n  funds from. An address source spends shielded funds (or, for a\n  transparent address, only that address's UTXOs); an account source\n  spends the funds named by `fund_source`.\n- `amounts` (array, required) An array of recipient amounts with fields:\n  - `address` (string, required) Recipient address.\n  - `amount` (numeric, required) Amount in ZEC.\n  - `memo` (string, optional) Optional memo for shielded recipients.\n- `minconf` (numeric, optional) Minimum confirmations for inputs.\n- `privacy_policy` (string, optional, default=`\"FullPrivacy\"`) The most\n  the transaction is permitted to reveal, using the same values as\n  `z_sendmany`: `\"FullPrivacy\"`, `\"AllowRevealedAmounts\"`,\n  `\"AllowRevealedRecipients\"`, `\"AllowRevealedSenders\"`,\n  `\"AllowFullyTransparent\"`, `\"AllowLinkingAccountAddresses\"`, or\n  `\"NoPrivacy\"` (see `z_sendmany` for what each permits). A proposal\n  that would reveal more than this is rejected; the minimum it actually\n  requires is reported back as `privacy_policy`.\n- `fund_source` (string or array, optional) Where funds may be drawn\n  from, when `from` is an account UUID: `\"orchard\"`, `\"sapling\"`,\n  `\"any_transparent\"`, or an array of transparent address strings.\n  Defaults to any shielded pool. Each source is isolating: a source that\n  cannot cover the payment fails rather than drawing on other funds.",
+      "params": [
+        {
+          "name": "from",
+          "summary": "The address, or the account UUID, to send funds from.",
+          "description": "The address, or the account UUID, to send funds from.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "amounts",
+          "summary": "An array of recipient amounts.",
+          "description": "An array of recipient amounts.",
+          "required": true,
+          "schema": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AmountParameter"
+            }
+          }
+        },
+        {
+          "name": "minconf",
+          "summary": "Minimum confirmations for inputs.",
+          "description": "Minimum confirmations for inputs.",
+          "schema": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        {
+          "name": "privacy_policy",
+          "summary": "The most the transaction is permitted to reveal, using the same values as `z_sendmany`. Defaults to \"FullPrivacy\".",
+          "description": "The most the transaction is permitted to reveal, using the same values as `z_sendmany`. Defaults to \"FullPrivacy\".",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "fund_source",
+          "summary": "Where funds may be drawn from, when `from` is an account UUID: \"orchard\", \"sapling\", \"any_transparent\", or an array of transparent addresses.",
+          "description": "Where funds may be drawn from, when `from` is an account UUID: \"orchard\", \"sapling\", \"any_transparent\", or an array of transparent addresses.",
+          "schema": true
+        }
+      ],
+      "result": {
+        "name": "pczt_create_result",
+        "summary": "Result of creating a PCZT.",
+        "description": "Result of creating a PCZT.",
+        "schema": {
+          "$ref": "#/components/schemas/CreateResult"
+        }
+      }
+    },
+    {
+      "name": "z_getbalanceforaccount",
+      "summary": "Returns the account's spendable balance for each value pool (\"transparent\",",
+      "description": "Returns the account's spendable balance for each value pool (\"transparent\",\n\"sapling\", and \"orchard\").\n\nPools for which the balance is zero are not shown.\n\n# Arguments\n\n- `account` (string or numeric, required) Either the UUID or the ZIP 32 account\n  index of the account, as returned by `z_getnewaccount`.\n- `minconf` (numeric, optional, default=1) Only include outputs in transactions\n  confirmed at least this many times.",
+      "params": [
+        {
+          "name": "account",
+          "summary": "Either the UUID or ZIP 32 account index of the account.",
+          "description": "Either the UUID or ZIP 32 account index of the account.",
+          "required": true,
+          "schema": true
+        },
+        {
+          "name": "minconf",
+          "summary": "Only include outputs in transactions confirmed at least this many times.",
+          "description": "Only include outputs in transactions confirmed at least this many times.",
+          "schema": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        }
+      ],
+      "result": {
+        "name": "z_getbalanceforaccount_result",
+        "summary": "The spendable balance of an account, split by value pool.",
+        "description": "The spendable balance of an account, split by value pool.",
+        "schema": {
+          "$ref": "#/components/schemas/BalanceForAccount"
+        }
+      }
+    },
+    {
+      "name": "z_getaccount",
+      "summary": "Returns details about the given account.",
+      "description": "Returns details about the given account.\n\n# Arguments\n- `account_uuid` (string, required): The UUID of the wallet account.",
+      "params": [
+        {
+          "name": "account_uuid",
+          "summary": "The UUID of the account.",
+          "description": "The UUID of the account.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "z_getaccount_result",
+        "summary": "Information about an account.",
+        "description": "Information about an account.",
+        "schema": {
+          "$ref": "#/components/schemas/Account4"
+        }
+      }
+    },
+    {
+      "name": "decodescript",
+      "summary": "Decodes a hex-encoded script.",
+      "description": "Decodes a hex-encoded script.\n\n# Arguments\n- `hexstring` (string, required): The hex-encoded script.",
+      "params": [
+        {
+          "name": "hexstring",
+          "summary": "The hex-encoded script.",
+          "description": "The hex-encoded script.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "decodescript_result",
+        "summary": "The result of decoding a script.",
+        "description": "The result of decoding a script.",
+        "schema": {
+          "$ref": "#/components/schemas/ResultType15"
+        }
+      }
+    },
+    {
+      "name": "z_viewtransaction",
+      "summary": "Returns detailed information about in-wallet transaction `txid`.",
+      "description": "Returns detailed information about in-wallet transaction `txid`.\n\nThis method returns information about spends and outputs within the transaction\nthat are visible to the wallet. Importantly, this does not include information\nabout spent notes that are not controlled by spending or viewing keys in the\nwallet, and so callers MUST NOT use the `spends` or `outputs` fields to compute\nbalances or fees themselves. Use the provided `accounts` and `fee` fields instead.",
+      "params": [
+        {
+          "name": "txid",
+          "summary": "The ID of the transaction to view.",
+          "description": "The ID of the transaction to view.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "z_viewtransaction_result",
+        "summary": "Detailed information about an in-wallet transaction.",
+        "description": "Detailed information about an in-wallet transaction.",
+        "schema": {
+          "$ref": "#/components/schemas/Transaction2"
+        }
+      }
+    },
+    {
+      "name": "z_exportkey",
+      "summary": "Exports the spending key for a Sapling payment address.",
+      "description": "Exports the spending key for a Sapling payment address.\n\nThe wallet must be unlocked to use this method.\n\n# Warning\n\nThis exports **only** the Sapling spending key. It is **not** a complete backup of\nthe funds reachable from this account's root of spending authority: in particular,\nany Orchard funds derived from the same seed are **not** represented by the exported\nkey. Do not rely on `z_exportkey` as a wallet backup \u2014 use a full seed/wallet backup\ninstead, or you may lose access to funds.\n\n# Arguments\n\n- `address` (string, required) The Sapling payment address corresponding to the\n  spending key to export.",
+      "params": [
+        {
+          "name": "address",
+          "summary": "The Sapling payment address corresponding to the spending key to export.",
+          "description": "The Sapling payment address corresponding to the spending key to export.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "z_exportkey_result",
+        "summary": "The exported Sapling extended spending key, encoded as a Bech32 string.",
+        "description": "The exported Sapling extended spending key, encoded as a Bech32 string.",
+        "schema": {
+          "$ref": "#/components/schemas/ResultType16"
+        }
+      }
+    },
+    {
+      "name": "pczt_inspect",
+      "summary": "Decodes a PCZT and describes what it commits to.",
+      "description": "Decodes a PCZT and describes what it commits to.\n\nReports the transaction's transparent inputs and outputs, its shielded\nbundles (with the recipient and value data its creator recorded), the\nimplied fee, the privacy policy recorded by `pczt_create`, and the\nproof/signature status of each bundle. Use this to review a PCZT before\nsigning it \u2014 particularly one that has passed through other parties.\n\nEverything reported is read from the PCZT as recorded by its creator;\nnothing is cryptographically verified until `pczt_extract`. Shielded\noutput details are creator-side metadata and may have been redacted.\n\n# Arguments\n- `pczt` (string, required) The base64-encoded PCZT to inspect.",
+      "params": [
+        {
+          "name": "pczt",
+          "summary": "The base64-encoded PCZT to inspect.",
+          "description": "The base64-encoded PCZT to inspect.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "pczt_inspect_result",
+        "summary": "Description of a PCZT.",
+        "description": "Description of a PCZT.",
+        "schema": {
+          "$ref": "#/components/schemas/InspectResult"
+        }
+      }
+    },
+    {
+      "name": "z_converttex",
+      "summary": "Converts a transparent P2PKH Zcash address to a TEX address.",
+      "description": "Converts a transparent P2PKH Zcash address to a TEX address.\n\nTEX addresses (defined in ZIP 320) are transparent-source-only addresses.\n\nThe input address must be valid for the network this node is running on.\n\n# Arguments\n- `transparent_address` (string, required): The transparent P2PKH address to convert.",
+      "params": [
+        {
+          "name": "transparent_address",
+          "summary": "The transparent P2PKH address to convert.",
+          "description": "The transparent P2PKH address to convert.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "z_converttex_result",
+        "summary": "The TEX address encoding of the input transparent P2PKH address.",
+        "description": "The TEX address encoding of the input transparent P2PKH address.",
+        "schema": {
+          "$ref": "#/components/schemas/ResultType17"
+        }
+      }
+    },
+    {
+      "name": "help",
+      "summary": "List all commands, or get help for a specified command.",
+      "description": "List all commands, or get help for a specified command.\n\nCommands that are not available on the network this node is running on (such as\nregtest-only commands) are omitted.\n\n# Arguments\n- `command` (string, optional) The command to get help on.",
+      "params": [
+        {
+          "name": "command",
+          "summary": "The command to get help on.",
+          "description": "The command to get help on.",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "help_result",
+        "summary": "The help response.",
+        "description": "The help response.",
+        "schema": {
+          "$ref": "#/components/schemas/ResultType18"
+        }
+      }
+    },
+    {
+      "name": "z_listtransactions",
+      "summary": "Returns a list of the wallet's transactions, optionally filtered by account and block",
+      "description": "Returns a list of the wallet's transactions, optionally filtered by account and block\nrange.\n\n# Arguments\n- `account_uuid`: The UUID of the wallet account. If omitted, return transactions for all\n  accounts in the wallet.\n- `start_height`: The inclusive lower bound of block heights for which transactions mined\n  in those blocks should be returned. If omitted, the start height will default to the\n  account birthday height if an account UUID is specified, or the minimum birthday\n  height among accounts in the wallet if no account is specified.\n- `end_height`: The exclusive upper bound of block heights for which transactions mined\n  in those blocks should be returned. If omitted, return all transactions mined or created\n  above the start height.\n- `offset`: An optional number of transactions to skip over before a page of results is\n  returned. Defaults to zero.\n- `limit`: An optional upper bound on the number of results that should be returned in a\n  page.\n\nWARNING: This is currently an experimental feature; arguments and result data may change at\nany time.",
+      "params": [
+        {
+          "name": "account_uuid",
+          "summary": "The UUID of the account to list transactions for.",
+          "description": "The UUID of the account to list transactions for.",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "start_height",
+          "summary": "The (inclusive) lower bound on block heights for which transactions should be retrieved",
+          "description": "The (inclusive) lower bound on block heights for which transactions should be retrieved",
+          "schema": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        {
+          "name": "end_height",
+          "summary": "The (exclusive) upper bound on block heights for which transactions should be retrieved",
+          "description": "The (exclusive) upper bound on block heights for which transactions should be retrieved",
+          "schema": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        {
+          "name": "offset",
+          "summary": "The number of results to skip before returning a page of results.",
+          "description": "The number of results to skip before returning a page of results.",
+          "schema": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        {
+          "name": "limit",
+          "summary": "The maximum number of results to return from a single call.",
+          "description": "The maximum number of results to return from a single call.",
+          "schema": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        }
+      ],
+      "result": {
+        "name": "z_listtransactions_result",
+        "summary": "A list of transactions involving the wallet.",
+        "description": "A list of transactions involving the wallet.",
+        "schema": {
+          "$ref": "#/components/schemas/ResultType19"
+        }
+      }
+    },
+    {
+      "name": "validateaddress",
+      "summary": "Validate a transparent Zcash address, returning information about it.",
+      "description": "Validate a transparent Zcash address, returning information about it.\n\n# Arguments\n- `address` (string, required): The transparent address to validate.",
+      "params": [
+        {
+          "name": "address",
+          "summary": "The transparent address to validate.",
+          "description": "The transparent address to validate.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "validateaddress_result",
+        "summary": "The result of validating a transparent Zcash address.",
+        "description": "The result of validating a transparent Zcash address.",
+        "schema": {
+          "$ref": "#/components/schemas/ValidateAddress"
+        }
+      }
+    },
+    {
+      "name": "walletpassphrase",
+      "summary": "Stores the wallet decryption key in memory for `timeout` seconds.",
+      "description": "Stores the wallet decryption key in memory for `timeout` seconds.\n\nIf the wallet is locked, this API must be invoked prior to performing operations\nthat require the availability of private keys, such as sending funds.\n\nIssuing the `walletpassphrase` command while the wallet is already unlocked will\nset a new unlock time that overrides the old one.",
+      "params": [
+        {
+          "name": "passphrase",
+          "summary": "The passphrase for decrypting the wallet's age identity.",
+          "description": "The passphrase for decrypting the wallet's age identity.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "timeout",
+          "summary": "Time in seconds after which the wallet will relock.",
+          "description": "Time in seconds after which the wallet will relock.",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          }
+        }
+      ],
+      "result": {
+        "name": "walletpassphrase_result",
+        "summary": "Empty result indicating success.",
+        "description": "Empty result indicating success.",
+        "schema": {
+          "$ref": "#/components/schemas/ResultType20"
+        }
+      }
+    },
+    {
+      "name": "rpc.discover",
+      "summary": "Returns an OpenRPC schema as a description of this service.",
+      "description": "Returns an OpenRPC schema as a description of this service.",
+      "params": [],
+      "result": {
+        "name": "rpc.discover_result",
+        "summary": "An OpenRPC document.",
+        "description": "An OpenRPC document.",
+        "schema": {
+          "$ref": "#/components/schemas/OpenRPC%20Schema"
+        }
+      }
+    },
+    {
+      "name": "pczt_sign",
+      "summary": "Signs a PCZT with the wallet's keys.",
+      "description": "Signs a PCZT with the wallet's keys.\n\nSigns every input the wallet holds keys for. Inputs belonging to other\nkeys are left unsigned and reported, unless `strict` is set.\n\nSigning commits to what the transaction reveals, so the caller must\nacknowledge the privacy policy recorded in the PCZT by `pczt_create`;\nomitting `privacy_policy` acknowledges only `FullPrivacy` and refuses to\nsign anything that reveals more.\n\n> \u26a0\ufe0f A PCZT that this wallet did not create \u2014 or that passed through\n> other parties on its way back \u2014 carries no recorded policy Zallet can\n> trust. Review what you are about to sign with `pczt_inspect`: a\n> counterparty could have altered the outputs, amounts, or recorded\n> policy of the PCZT.\n\n# Arguments\n- `pczt` (string, required) The base64-encoded PCZT to sign.\n- `privacy_policy` (string, optional, default=`\"FullPrivacy\"`) Policy\n  acknowledging what information the transaction may reveal, using the\n  same values as `z_sendmany`: `\"FullPrivacy\"`,\n  `\"AllowRevealedAmounts\"`, `\"AllowRevealedRecipients\"`,\n  `\"AllowRevealedSenders\"`, `\"AllowFullyTransparent\"`,\n  `\"AllowLinkingAccountAddresses\"`, or `\"NoPrivacy\"`. Must be at least\n  as permissive as the policy reported by `pczt_create`.\n- `strict` (bool, optional) If true, fail if any inputs cannot be signed.",
+      "params": [
+        {
+          "name": "pczt",
+          "summary": "The base64-encoded PCZT to sign.",
+          "description": "The base64-encoded PCZT to sign.",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "privacy_policy",
+          "summary": "Policy acknowledging what information the transaction may reveal, using the same values as `z_sendmany`. Defaults to \"FullPrivacy\".",
+          "description": "Policy acknowledging what information the transaction may reveal, using the same values as `z_sendmany`. Defaults to \"FullPrivacy\".",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "strict",
+          "summary": "If true, fail if any inputs cannot be signed.",
+          "description": "If true, fail if any inputs cannot be signed.",
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "result": {
+        "name": "pczt_sign_result",
+        "summary": "Result of signing a PCZT.",
+        "description": "Result of signing a PCZT.",
+        "schema": {
+          "$ref": "#/components/schemas/SignResult"
+        }
+      }
+    },
+    {
+      "name": "z_getoperationresult",
+      "summary": "Retrieve the result and status of an operation which has finished, and then remove",
+      "description": "Retrieve the result and status of an operation which has finished, and then remove\nthe operation from memory.\n\n- If the operation has failed, it will include an error object.\n- If the operation has succeeded, it will include the result value.\n- If the operation was cancelled, there will be no error object or result value.\n\n# Arguments\n- `operationid` (array, optional) A list of operation ids we are interested in.\n  If not provided, retrieve all finished operations known to the node.",
+      "params": [
+        {
+          "name": "operationid",
+          "summary": "A list of operation ids we are interested in.",
+          "description": "A list of operation ids we are interested in.",
+          "schema": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperationId"
+            }
+          }
+        }
+      ],
+      "result": {
+        "name": "z_getoperationresult_result",
+        "summary": "The relevant operations.",
+        "description": "The relevant operations.",
+        "schema": {
+          "$ref": "#/components/schemas/ResultType2"
+        }
+      }
+    }
+  ],
+  "components": {
+    "schemas": {
+      "ResultType": {
+        "type": "string",
+        "description": "The result of signing a message."
+      },
+      "TotalBalance": {
+        "type": "object",
+        "properties": {
+          "transparent": {
+            "type": "string",
+            "description": "The total value of unspent transparent outputs, in ZEC"
+          },
+          "private": {
+            "type": "string",
+            "description": "The total value of unspent Sapling, Orchard, and Ironwood outputs, in ZEC"
+          },
+          "total": {
+            "type": "string",
+            "description": "The total value of unspent shielded and transparent outputs, in ZEC"
+          }
+        },
+        "required": [
+          "transparent",
+          "private",
+          "total"
+        ],
+        "description": "The total value of funds stored in the wallet."
+      },
+      "OperationId": {
+        "type": "string",
+        "description": "An async operation ID."
+      },
+      "ResultType2": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/OperationStatus"
+        },
+        "description": "The relevant operations."
+      },
+      "OperationStatus": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/OperationId"
+          },
+          "method": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "params": true,
+          "status": {
+            "$ref": "#/components/schemas/OperationState"
+          },
+          "creation_time": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperationError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "result": true,
+          "execution_secs": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint64",
+            "minimum": 0,
+            "description": "Execution time for successful operations."
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "creation_time"
+        ],
+        "description": "The status of an async operation."
+      },
+      "OperationState": {
+        "type": "string",
+        "enum": [
+          "Ready",
+          "Executing",
+          "Cancelled",
+          "Failed",
+          "Success"
+        ],
+        "description": "The possible states that an async operation can be in."
+      },
+      "OperationError": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Code"
+          },
+          "message": {
+            "type": "string",
+            "description": "Message"
+          },
+          "data": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional data"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ]
+      },
+      "ShieldCoinbaseResult": {
+        "type": "object",
+        "properties": {
+          "remainingUTXOs": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "description": "Number of coinbase UTXOs that were eligible for shielding but were not\nselected by this operation. Non-zero when the caller supplied a `limit`\nthat was smaller than the count of eligible coinbase UTXOs."
+          },
+          "remainingValue": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Total value (in ZEC) of coinbase UTXOs that were eligible for\nshielding but were not selected by this operation. See `remainingUTXOs`."
+          },
+          "shieldingUTXOs": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "description": "Number of coinbase UTXOs being shielded by this operation."
+          },
+          "shieldingValue": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Total value (in ZEC) of coinbase UTXOs being shielded by this\noperation."
+          },
+          "opid": {
+            "$ref": "#/components/schemas/OperationId",
+            "description": "Operation id to pass to `z_getoperationstatus` /\n`z_getoperationresult` to retrieve the final result."
+          }
+        },
+        "required": [
+          "remainingUTXOs",
+          "remainingValue",
+          "shieldingUTXOs",
+          "shieldingValue",
+          "opid"
+        ],
+        "description": "The result of a `z_shieldcoinbase` pre-flight call.\n\nMirrors the JSON object returned by `zcashd`'s `z_shieldcoinbase`:\n`{ remainingUTXOs, remainingValue, shieldingUTXOs, shieldingValue, opid }`."
+      },
+      "ResultType3": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/OperationId"
+        },
+        "description": "A list of operation IDs."
+      },
+      "ResultType4": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/AddressSource"
+        },
+        "description": "A list of address sources."
+      },
+      "AddressSource": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "transparent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransparentAddresses"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "This object contains transparent addresses for which we have no derivation\ninformation."
+          },
+          "derived_transparent": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DerivedTransparentAddresses"
+            },
+            "description": "Each element in this list represents a set of transparent addresses derived from a\nsingle BIP 44 account index."
+          },
+          "sapling": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaplingAddresses"
+            },
+            "description": "Each element in this list represents a set of diversified addresses derived from a\nsingle IVK."
+          },
+          "unified": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnifiedAddresses"
+            },
+            "description": "Each element in this list represents a set of diversified Unified Addresses\nderived from a single UFVK."
+          }
+        },
+        "required": [
+          "source",
+          "derived_transparent",
+          "sapling",
+          "unified"
+        ]
+      },
+      "TransparentAddresses": {
+        "type": "object",
+        "properties": {
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "changeAddresses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "addresses",
+          "changeAddresses"
+        ]
+      },
+      "DerivedTransparentAddresses": {
+        "type": "object",
+        "properties": {
+          "seedfp": {
+            "type": "string"
+          },
+          "account": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The BIP 44 account index."
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "changeAddresses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ephemeralAddresses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "seedfp",
+          "account",
+          "addresses",
+          "changeAddresses",
+          "ephemeralAddresses"
+        ]
+      },
+      "SaplingAddresses": {
+        "type": "object",
+        "properties": {
+          "zip32KeyPath": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "addresses"
+        ]
+      },
+      "UnifiedAddresses": {
+        "type": "object",
+        "properties": {
+          "seedfp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "account": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The ZIP 32 account index."
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnifiedAddress"
+            }
+          }
+        },
+        "required": [
+          "addresses"
+        ]
+      },
+      "UnifiedAddress": {
+        "type": "object",
+        "properties": {
+          "diversifier_index": {
+            "type": "integer",
+            "format": "uint128",
+            "minimum": 0,
+            "description": "The diversifier index that the UA was derived at."
+          },
+          "receiver_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The receiver types that the UA contains (valid values are \"p2pkh\", \"sapling\", \"orchard\")."
+          },
+          "address": {
+            "type": "string",
+            "description": "The unified address corresponding to the diversifier."
+          }
+        },
+        "required": [
+          "diversifier_index",
+          "receiver_types",
+          "address"
+        ]
+      },
+      "ResultType5": {
+        "type": "boolean",
+        "description": "The result of verifying a message signature."
+      },
+      "TransactionDetails": {
+        "type": "object",
+        "properties": {
+          "txid": {
+            "type": "string",
+            "description": "The transaction ID (same as provided)."
+          },
+          "authdigest": {
+            "type": "string",
+            "description": "The transaction's authorizing data commitment.\n\nFor pre-v5 transactions this will be `ffff..ffff`.\n\nEncoded as a byte-reversed hex string to match `txid`."
+          },
+          "size": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "description": "The network-serialized transaction size."
+          },
+          "overwintered": {
+            "type": "boolean",
+            "description": "Whether the `overwintered` flag is set."
+          },
+          "version": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The transaction version."
+          },
+          "versiongroupid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The version group ID.\n\nOmitted if `overwintered` is `false`."
+          },
+          "locktime": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The lock time."
+          },
+          "expiryheight": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The block height after which the transaction expires.\n\nOmitted if `overwintered` is `false`."
+          },
+          "vin": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransparentInput"
+            },
+            "description": "The transparent inputs to the transaction."
+          },
+          "vout": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransparentOutput"
+            },
+            "description": "The transparent outputs from the transaction."
+          },
+          "valueBalance": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "The net value of Sapling Spends minus Outputs in ZEC.\n\nOmitted if `version < 4`."
+          },
+          "valueBalanceZat": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The net value of Sapling Spends minus Outputs in zatoshis.\n\nOmitted if `version < 4`."
+          },
+          "vShieldedSpend": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/SaplingSpend"
+            },
+            "description": "Omitted if `version < 4`."
+          },
+          "vShieldedOutput": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/SaplingOutput"
+            },
+            "description": "Omitted if `version < 4`."
+          },
+          "bindingSig": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Sapling binding signature, encoded as a hex string.\n\nOmitted if `version < 4`, or both `vShieldedSpend` and `vShieldedOutput` are empty."
+          },
+          "orchard": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Orchard"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "JSON object with Orchard-specific information.\n\nOmitted if `version < 5`."
+          },
+          "ironwood": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Orchard"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "JSON object with Ironwood-specific information.\n\nIronwood (NU6.3, ZIP 2005) actions are Orchard-shaped, so this has the\nsame shape as the `orchard` field. Omitted if `version < 6`."
+          }
+        },
+        "required": [
+          "txid",
+          "authdigest",
+          "size",
+          "overwintered",
+          "version",
+          "locktime",
+          "vin",
+          "vout"
+        ],
+        "description": "Verbose information about a transaction."
+      },
+      "TransparentInput": {
+        "type": "object",
+        "properties": {
+          "coinbase": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The coinbase `scriptSig`, encoded as a hex string.\n\nOmitted if this is not a coinbase transaction."
+          },
+          "txid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The transaction ID of the output being spent.\n\nOmitted if this is a coinbase transaction."
+          },
+          "vout": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The index of the output being spent within the transaction identified by `txid`.\n\nOmitted if this is a coinbase transaction."
+          },
+          "scriptSig": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransparentScriptSig"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Omitted if this is a coinbase transaction."
+          },
+          "sequence": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The script sequence number."
+          }
+        },
+        "required": [
+          "sequence"
+        ]
+      },
+      "TransparentScriptSig": {
+        "type": "object",
+        "properties": {
+          "asm": {
+            "type": "string",
+            "description": "The assembly string representation of the script."
+          },
+          "hex": {
+            "type": "string",
+            "description": "The serialized script, encoded as a hex string."
+          }
+        },
+        "required": [
+          "asm",
+          "hex"
+        ]
+      },
+      "TransparentOutput": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The value in ZEC."
+          },
+          "valueZat": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "description": "The value in zatoshis."
+          },
+          "valueSat": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "description": "The value in zatoshis."
+          },
+          "n": {
+            "type": "integer",
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "The index of the output within the transaction's `vout` field."
+          },
+          "scriptPubKey": {
+            "$ref": "#/components/schemas/TransparentScriptPubKey"
+          }
+        },
+        "required": [
+          "value",
+          "valueZat",
+          "valueSat",
+          "n",
+          "scriptPubKey"
+        ]
+      },
+      "TransparentScriptPubKey": {
+        "type": "object",
+        "properties": {
+          "hex": {
+            "type": "string",
+            "description": "The serialized script, encoded as a hex string."
+          },
+          "asm": {
+            "type": "string",
+            "description": "The assembly string representation of the script."
+          },
+          "reqSigs": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint8",
+            "minimum": 0,
+            "maximum": 255,
+            "description": "The required number of signatures to spend this output.\n\nOmitted for scripts that don't contain identifiable addresses (such as\nnon-standard or null-data scripts)."
+          },
+          "type": {
+            "type": "string",
+            "description": "The type of script.\n\nOne of `[\"pubkey\", \"pubkeyhash\", \"scripthash\", \"multisig\", \"nulldata\", \"nonstandard\"]`."
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of the transparent addresses involved in the script.\n\nOmitted for scripts that don't contain identifiable addresses (such as\nnon-standard or null-data scripts)."
+          }
+        },
+        "required": [
+          "hex",
+          "asm",
+          "type",
+          "addresses"
+        ]
+      },
+      "SaplingSpend": {
+        "type": "object",
+        "properties": {
+          "cv": {
+            "type": "string",
+            "description": "Value commitment to the input note.\n\nEncoded as a byte-reversed hex string for legacy reasons."
+          },
+          "anchor": {
+            "type": "string",
+            "description": "Merkle root of the Sapling note commitment tree.\n\nEncoded as a byte-reversed hex string for legacy reasons."
+          },
+          "nullifier": {
+            "type": "string",
+            "description": "The nullifier of the input note.\n\nEncoded as a byte-reversed hex string for legacy reasons."
+          },
+          "rk": {
+            "type": "string",
+            "description": "The randomized public key for `spendAuthSig`.\n\nEncoded as a byte-reversed hex string for legacy reasons."
+          },
+          "proof": {
+            "type": "string",
+            "description": "A zero-knowledge proof using the Sapling Spend circuit, encoded as a hex string."
+          },
+          "spendAuthSig": {
+            "type": "string",
+            "description": "A signature authorizing this Spend, encoded as a hex string."
+          }
+        },
+        "required": [
+          "cv",
+          "anchor",
+          "nullifier",
+          "rk",
+          "proof",
+          "spendAuthSig"
+        ]
+      },
+      "SaplingOutput": {
+        "type": "object",
+        "properties": {
+          "cv": {
+            "type": "string",
+            "description": "Value commitment to the output note.\n\nEncoded as a byte-reversed hex string for legacy reasons."
+          },
+          "cmu": {
+            "type": "string",
+            "description": "The u-coordinate of the note commitment for the output note.\n\nEncoded as a byte-reversed hex string for legacy reasons."
+          },
+          "ephemeralKey": {
+            "type": "string",
+            "description": "A Jubjub public key.\n\nEncoded as a byte-reversed hex string for legacy reasons."
+          },
+          "encCiphertext": {
+            "type": "string",
+            "description": "The output note encrypted to the recipient, encoded as a hex string."
+          },
+          "outCiphertext": {
+            "type": "string",
+            "description": "A ciphertext enabling the sender to recover the output note, encoded as a hex\nstring."
+          },
+          "proof": {
+            "type": "string",
+            "description": "A zero-knowledge proof using the Sapling Output circuit, encoded as a hex string."
+          }
+        },
+        "required": [
+          "cv",
+          "cmu",
+          "ephemeralKey",
+          "encCiphertext",
+          "outCiphertext",
+          "proof"
+        ]
+      },
+      "Orchard": {
+        "type": "object",
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrchardAction"
+            },
+            "description": "The Orchard Actions for the transaction."
+          },
+          "valueBalance": {
+            "type": "number",
+            "description": "The net value of Orchard Actions in ZEC."
+          },
+          "valueBalanceZat": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The net value of Orchard Actions in zatoshis."
+          },
+          "flags": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrchardFlags"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Orchard bundle flags.\n\nOmitted if `actions` is empty."
+          },
+          "anchor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A root of the Orchard note commitment tree at some block height in the past,\nencoded as a hex string.\n\nOmitted if `actions` is empty."
+          },
+          "proof": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Encoding of aggregated zk-SNARK proofs for Orchard Actions, encoded as a hex\nstring.\n\nOmitted if `actions` is empty."
+          },
+          "bindingSig": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "An Orchard binding signature on the SIGHASH transaction hash, encoded as a hex\nstring.\n\nOmitted if `actions` is empty."
+          }
+        },
+        "required": [
+          "actions",
+          "valueBalance",
+          "valueBalanceZat"
+        ]
+      },
+      "OrchardAction": {
+        "type": "object",
+        "properties": {
+          "cv": {
+            "type": "string",
+            "description": "A value commitment to the net value of the input note minus the output note,\nencoded as a hex string."
+          },
+          "nullifier": {
+            "type": "string",
+            "description": "The nullifier of the input note, encoded as a hex string."
+          },
+          "rk": {
+            "type": "string",
+            "description": "The randomized validating key for `spendAuthSig`, encoded as a hex string."
+          },
+          "cmx": {
+            "type": "string",
+            "description": "The x-coordinate of the note commitment for the output note, encoded as a hex\nstring."
+          },
+          "ephemeralKey": {
+            "type": "string",
+            "description": "An encoding of an ephemeral Pallas public key, encoded as a hex string."
+          },
+          "encCiphertext": {
+            "type": "string",
+            "description": "The output note encrypted to the recipient, encoded as a hex string."
+          },
+          "outCiphertext": {
+            "type": "string",
+            "description": "A ciphertext enabling the sender to recover the output note, encoded as a hex\nstring."
+          },
+          "spendAuthSig": {
+            "type": "string",
+            "description": "A signature authorizing the spend in this Action, encoded as a hex string."
+          }
+        },
+        "required": [
+          "cv",
+          "nullifier",
+          "rk",
+          "cmx",
+          "ephemeralKey",
+          "encCiphertext",
+          "outCiphertext",
+          "spendAuthSig"
+        ]
+      },
+      "OrchardFlags": {
+        "type": "object",
+        "properties": {
+          "enableSpends": {
+            "type": "boolean",
+            "description": "Whether spends are enabled in this Orchard bundle."
+          },
+          "enableOutputs": {
+            "type": "boolean",
+            "description": "Whether outputs are enabled in this Orchard bundle."
+          }
+        },
+        "required": [
+          "enableSpends",
+          "enableOutputs"
+        ]
+      },
+      "GetWalletStatus": {
+        "type": "object",
+        "properties": {
+          "node_tip": {
+            "$ref": "#/components/schemas/ChainTip",
+            "description": "The backing full node's view of the chain tip."
+          },
+          "wallet_tip": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChainTip"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The wallet's view of the chain tip.\n\nThis should only diverge from `node_tip` for very short periods of time.\n\nOmitted if the wallet has just been started for the first time and has not yet\nbegun syncing."
+          },
+          "fully_synced_height": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The height to which the wallet is fully synced.\n\nThe wallet only has a partial view of chain data above this height.\n\nOmitted if the wallet does not have any accounts or birthday data and thus has\nnowhere to sync from, or if the wallet birthday itself has not yet been synced.\nThe latter occurs when a recovered wallet first starts and is scanning the chain\ntip region."
+          },
+          "sync_work_remaining": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SyncWorkRemaining"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The height up to which the wallet has full information.\n\nOmitted if the wallet is fully synced (which requires that `fully_synced_height`\nis equal to `wallet_tip.height`)."
+          },
+          "locked": {
+            "type": "boolean",
+            "description": "Whether the wallet is currently locked because it is not synced with the chain.\n\nWhile locked, the balance and spend JSON-RPC methods return an error instead of\noperating on an incomplete or untrustworthy view of the chain. This is the case\nboth while the wallet is still catching up to the chain tip and while it is\nrecovering from a detected chain reorganization."
+          }
+        },
+        "required": [
+          "node_tip",
+          "locked"
+        ],
+        "description": "The wallet status information."
+      },
+      "ChainTip": {
+        "type": "object",
+        "properties": {
+          "blockhash": {
+            "type": "string",
+            "description": "The hash of the block at the chain tip."
+          },
+          "height": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The height of the block in the chain."
+          }
+        },
+        "required": [
+          "blockhash",
+          "height"
+        ]
+      },
+      "SyncWorkRemaining": {
+        "type": "object",
+        "properties": {
+          "unscanned_blocks": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The number of blocks within the wallet's view of the chain that have not yet been\nscanned."
+          },
+          "progress": {
+            "$ref": "#/components/schemas/Progress",
+            "description": "Approximate sync progress, as a `numerator / denominator` fraction.\n\nThis is currently derived from scanned block ranges. Once the wallet always tracks\nthe note commitment tree sizes (zcash/zallet#237), this will be refined to an exact\ncount of the unscanned note commitments."
+          }
+        },
+        "required": [
+          "unscanned_blocks",
+          "progress"
+        ]
+      },
+      "Progress": {
+        "type": "object",
+        "properties": {
+          "numerator": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          },
+          "denominator": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "numerator",
+          "denominator"
+        ],
+        "description": "A sync-progress fraction."
+      },
+      "ResultType6": {
+        "type": "object",
+        "properties": {
+          "address_type": {
+            "type": "string",
+            "description": "The type of the imported address (always \"sapling\")."
+          },
+          "address": {
+            "type": "string",
+            "description": "The Sapling payment address corresponding to the imported viewing key\n(the default address)."
+          }
+        },
+        "required": [
+          "address_type",
+          "address"
+        ],
+        "description": "Result of importing a viewing key."
+      },
+      "GetNotesCount": {
+        "type": "object",
+        "properties": {
+          "sprout": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The number of Sprout notes in the wallet.\n\nAlways zero, because Sprout is not supported."
+          },
+          "sapling": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The number of Sapling notes in the wallet."
+          },
+          "orchard": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The number of Orchard notes in the wallet."
+          },
+          "ironwood": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The number of Ironwood notes in the wallet.\n\nIronwood (NU6.3, ZIP 2005) notes are Orchard-shaped but tracked as a\ndistinct pool."
+          }
+        },
+        "required": [
+          "sprout",
+          "sapling",
+          "orchard",
+          "ironwood"
+        ],
+        "description": "The number of notes in the wallet."
+      },
+      "ResultType7": {
+        "type": "string",
+        "description": "The exported viewing key, as a bech32- or bech32m-encoded string."
+      },
+      "ResultType8": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/UnspentOutput"
+        },
+        "description": "A list of unspent notes."
+      },
+      "UnspentOutput": {
+        "type": "object",
+        "properties": {
+          "txid": {
+            "type": "string",
+            "description": "The ID of the transaction that created this output."
+          },
+          "pool": {
+            "type": "string",
+            "description": "The shielded value pool.\n\nOne of `[\"sapling\", \"orchard\", \"ironwood\", \"transparent\"]`."
+          },
+          "outindex": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The Transparent UTXO, Sapling output or Orchard action index."
+          },
+          "confirmations": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The number of confirmations."
+          },
+          "is_watch_only": {
+            "type": "boolean",
+            "description": "`true` if the account that received the output is watch-only"
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Zcash address that received the output.\n\nOmitted if this output was received on an account-internal address (for example, change\nand shielding outputs)."
+          },
+          "account_uuid": {
+            "type": "string",
+            "description": "The UUID of the wallet account that received this output."
+          },
+          "walletInternal": {
+            "type": "boolean",
+            "description": "`true` if the output was received by the account's internal viewing key.\n\nThe `address` field is guaranteed be absent when this field is set to `true`, in which case\nit indicates that this may be a change output, an output of a wallet-internal shielding\ntransaction, an output of a wallet-internal cross-account transfer, or otherwise is the\nresult of some wallet-internal operation."
+          },
+          "generated": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "`true` if the output was produced by a coinbase transaction.\n\nOmitted if this is a shielded output."
+          },
+          "value": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The value of the output in ZEC."
+          },
+          "valueZat": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "description": "The value of the output in zatoshis."
+          },
+          "memo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Hexadecimal string representation of the memo field.\n\nOmitted if this is a transparent output."
+          },
+          "memoStr": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "UTF-8 string representation of memo field (if it contains valid UTF-8)."
+          }
+        },
+        "required": [
+          "txid",
+          "pool",
+          "outindex",
+          "confirmations",
+          "is_watch_only",
+          "account_uuid",
+          "walletInternal",
+          "value",
+          "valueZat"
+        ]
+      },
+      "ResultType9": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "The type of address imported: \"p2pkh\" or \"p2sh\"."
+          },
+          "address": {
+            "type": "string",
+            "description": "The transparent address corresponding to the imported data."
+          }
+        },
+        "required": [
+          "type",
+          "address"
+        ],
+        "description": "The result of importing an address."
+      },
+      "ListUnifiedReceivers": {
+        "type": "object",
+        "properties": {
+          "p2pkh": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The legacy P2PKH transparent address.\n\nOmitted if `p2sh` is present."
+          },
+          "p2sh": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The legacy P2SH transparent address.\n\nOmitted if `p2pkh` is present."
+          },
+          "sapling": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The legacy Sapling address."
+          },
+          "orchard": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A single-receiver Unified Address containing the Orchard receiver."
+          }
+        },
+        "description": "The receivers within a unified address."
+      },
+      "Address": {
+        "type": "object",
+        "properties": {
+          "account_uuid": {
+            "type": "string",
+            "description": "The account's UUID within this Zallet instance."
+          },
+          "account": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint64",
+            "minimum": 0,
+            "description": "The ZIP 32 account ID."
+          },
+          "diversifier_index": {
+            "type": "integer",
+            "format": "uint128",
+            "minimum": 0,
+            "description": "The diversifier index specified or chosen."
+          },
+          "receiver_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The receiver types that the UA contains (valid values are \"p2pkh\", \"sapling\", \"orchard\")."
+          },
+          "address": {
+            "type": "string",
+            "description": "The unified address corresponding to the diversifier."
+          }
+        },
+        "required": [
+          "account_uuid",
+          "diversifier_index",
+          "receiver_types",
+          "address"
+        ],
+        "description": "Information about a derived Unified Address."
+      },
+      "CombineResult": {
+        "type": "object",
+        "properties": {
+          "pczt": {
+            "type": "string",
+            "description": "The base64-encoded combined PCZT."
+          }
+        },
+        "required": [
+          "pczt"
+        ],
+        "description": "Result containing the combined PCZT."
+      },
+      "ResultType10": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/Account"
+        },
+        "description": "A list of accounts."
+      },
+      "Account": {
+        "type": "object",
+        "properties": {
+          "account_uuid": {
+            "type": "string",
+            "description": "The account's UUID within this Zallet instance."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The account name.\n\nOmitted if the account has no configured name."
+          },
+          "seedfp": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The account's seed fingerprint.\n\nOmitted if the account has no known derivation information."
+          },
+          "zip32_account_index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The account's ZIP 32 account index.\n\nOmitted if the account has no known derivation information."
+          },
+          "account": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The account's ZIP 32 account index.\n\nOmitted if the account has no known derivation information."
+          },
+          "addresses": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/Address2"
+            },
+            "description": "The addresses known to the wallet for this account.\n\nOmitted if `include_addresses` is `false`."
+          }
+        },
+        "required": [
+          "account_uuid"
+        ]
+      },
+      "Address2": {
+        "type": "object",
+        "properties": {
+          "diversifier_index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint128",
+            "minimum": 0,
+            "description": "A diversifier index used in the account to derive this address."
+          },
+          "ua": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The unified address.\n\nOmitted if this is not a unified address."
+          },
+          "sapling": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Sapling address.\n\nOmitted if this is not a Sapling address."
+          },
+          "transparent": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The transparent address.\n\nOmitted if this is not a transparent address."
+          }
+        }
+      },
+      "ResultType11": {
+        "type": "null",
+        "description": "The stop response."
+      },
+      "ExtractResult": {
+        "type": "object",
+        "properties": {
+          "hex": {
+            "type": "string",
+            "description": "The hex-encoded raw transaction."
+          },
+          "txid": {
+            "type": "string",
+            "description": "The transaction ID."
+          },
+          "stored": {
+            "type": "boolean",
+            "description": "Whether the wallet recorded the transaction before returning it.\n\n`true` for a PCZT this wallet created: the spent notes are tracked as\npending from this point. `false` for a PCZT created elsewhere, which the\nwallet will only learn about when it appears on chain."
+          }
+        },
+        "required": [
+          "hex",
+          "txid",
+          "stored"
+        ],
+        "description": "Result containing the extracted transaction."
+      },
+      "Balances": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccountBalance"
+            },
+            "description": "The balances held by each Unified Account spending authority in the wallet."
+          },
+          "legacy_transparent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransparentBalance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The balance of transparent funds held by legacy transparent keys.\n\nAll funds held in legacy transparent addresses are treated as though they are\nassociated with a single spending authority.\n\nOmitted if `features.legacy_pool_seed_fingerprint` is unset in the Zallet config,\nor no legacy transparent funds are present."
+          },
+          "legacy_transparent_watchonly": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransparentBalance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The balance of transparent funds held by legacy watch-only transparent addresses.\n\nAll funds held in legacy transparent addresses are treated as though they are\nassociated with a single spending authority.\n\nOmitted if `features.legacy_pool_seed_fingerprint` is unset in the Zallet config,\nor no legacy transparent funds are present."
+          }
+        },
+        "required": [
+          "accounts"
+        ],
+        "description": "The balances available for each independent spending authority held by the wallet."
+      },
+      "AccountBalance": {
+        "type": "object",
+        "properties": {
+          "account_uuid": {
+            "type": "string",
+            "description": "The account's UUID within this Zallet instance."
+          },
+          "transparent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransparentBalance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The balance held by the account in the transparent pool.\n\nThis includes all funds held by transparent addresses derived from the account's\nviewing key, and excludes all funds held by watch-only standalone transparent\naddresses imported into the account.\n\nOmitted if no transparent funds are present."
+          },
+          "transparent_watchonly": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StandaloneTransparentAddressBalance"
+            },
+            "description": "The balance held by each watch-only standalone transparent address imported into\nthe account.\n\nOmitted if the account has no standalone transparent addresses."
+          },
+          "sapling": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Balance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The balance held by the account in the Sapling shielded pool.\n\nOmitted if no Sapling funds are present."
+          },
+          "orchard": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Balance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The balance held by the account in the Orchard shielded pool.\n\nOmitted if no Orchard funds are present."
+          },
+          "ironwood": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Balance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The balance held by the account in the Ironwood shielded pool.\n\nIronwood (NU6.3, ZIP 2005) notes are Orchard-shaped but tracked as a\ndistinct pool. Omitted if no Ironwood funds are present."
+          },
+          "total": {
+            "$ref": "#/components/schemas/Balance",
+            "description": "The total funds in all pools held by the account."
+          }
+        },
+        "required": [
+          "account_uuid",
+          "transparent_watchonly",
+          "total"
+        ]
+      },
+      "TransparentBalance": {
+        "type": "object",
+        "properties": {
+          "regular": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Balance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The transparent balance excluding coinbase outputs.\n\nOmitted if no non-coinbase funds are present."
+          },
+          "coinbase": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Balance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The transparent balance in coinbase outputs.\n\nOmitted if no coinbase funds are present."
+          }
+        }
+      },
+      "Balance": {
+        "type": "object",
+        "properties": {
+          "spendable": {
+            "$ref": "#/components/schemas/Value",
+            "description": "Balance that is spendable at the requested number of confirmations."
+          },
+          "locked": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Value"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Balance that is spendable at the requested number of confirmations, but currently\nlocked by some other spend operation.\n\nOmitted if zero."
+          },
+          "pending": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Value"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pending balance that is not currently spendable at the requested number of\nconfirmations, but will become spendable later.\n\nOmitted if zero."
+          },
+          "dust": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Value"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Unspendable balance due to individual note values being too small.\n\nThe wallet might on occasion be able to sweep some of these notes into spendable\noutputs (for example, when a transaction it is creating would otherwise have\nalready-paid-for Orchard dummy spends), but these values should never be counted\nas part of the wallet's spendable balance because they cannot be spent on demand.\n\nOmitted if zero."
+          }
+        },
+        "required": [
+          "spendable"
+        ]
+      },
+      "Value": {
+        "type": "object",
+        "properties": {
+          "valueZat": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "description": "The balance in zatoshis."
+          }
+        },
+        "required": [
+          "valueZat"
+        ]
+      },
+      "StandaloneTransparentAddressBalance": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "The standalone transparent address."
+          },
+          "regular": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Balance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The transparent balance excluding coinbase outputs.\n\nOmitted if no non-coinbase funds are present."
+          },
+          "coinbase": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Balance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The transparent balance in coinbase outputs.\n\nOmitted if no coinbase funds are present."
+          }
+        },
+        "required": [
+          "address"
+        ]
+      },
+      "ResultType12": {
+        "type": "null",
+        "description": "Empty result indicating success."
+      },
+      "Account2": {
+        "type": "object",
+        "properties": {
+          "account_uuid": {
+            "type": "string",
+            "description": "The new account's UUID within this Zallet instance."
+          },
+          "account": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint64",
+            "minimum": 0,
+            "description": "The new account's ZIP 32 account index."
+          }
+        },
+        "required": [
+          "account_uuid"
+        ],
+        "description": "Information about the new account."
+      },
+      "ResultType13": {
+        "type": "object",
+        "properties": {
+          "address_type": {
+            "type": "string",
+            "description": "The type of the imported address (always \"sapling\")."
+          },
+          "address": {
+            "type": "string",
+            "description": "The Sapling payment address corresponding to the imported key."
+          }
+        },
+        "required": [
+          "address_type",
+          "address"
+        ],
+        "description": "Result of importing a spending key."
+      },
+      "ResultType14": {
+        "anyOf": [
+          {
+            "type": "string",
+            "description": "The serialized, hex-encoded data for `txid`."
+          },
+          {
+            "$ref": "#/components/schemas/Transaction",
+            "description": "An object describing the transaction in detail."
+          }
+        ],
+        "description": "The `getrawtransaction` response."
+      },
+      "Transaction": {
+        "type": "object",
+        "properties": {
+          "in_active_chain": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Whether specified block is in the active chain or not.\n\nOnly present with explicit `blockhash` argument."
+          },
+          "hex": {
+            "type": "string",
+            "description": "The serialized, hex-encoded data for the transaction identified by `txid`."
+          },
+          "txid": {
+            "type": "string",
+            "description": "The transaction ID (same as provided)."
+          },
+          "authdigest": {
+            "type": "string",
+            "description": "The transaction's authorizing data commitment.\n\nFor pre-v5 transactions this will be `ffff..ffff`.\n\nEncoded as a byte-reversed hex string to match `txid`."
+          },
+          "size": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "description": "The network-serialized transaction size."
+          },
+          "overwintered": {
+            "type": "boolean",
+            "description": "Whether the `overwintered` flag is set."
+          },
+          "version": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The transaction version."
+          },
+          "versiongroupid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The version group ID.\n\nOmitted if `overwintered` is `false`."
+          },
+          "locktime": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The lock time."
+          },
+          "expiryheight": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The block height after which the transaction expires.\n\nOmitted if `overwintered` is `false`."
+          },
+          "vin": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransparentInput"
+            },
+            "description": "The transparent inputs to the transaction."
+          },
+          "vout": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransparentOutput"
+            },
+            "description": "The transparent outputs from the transaction."
+          },
+          "valueBalance": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "The net value of Sapling Spends minus Outputs in ZEC.\n\nOmitted if `version < 4`."
+          },
+          "valueBalanceZat": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The net value of Sapling Spends minus Outputs in zatoshis.\n\nOmitted if `version < 4`."
+          },
+          "vShieldedSpend": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/SaplingSpend"
+            },
+            "description": "Omitted if `version < 4`."
+          },
+          "vShieldedOutput": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/SaplingOutput"
+            },
+            "description": "Omitted if `version < 4`."
+          },
+          "bindingSig": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Sapling binding signature, encoded as a hex string.\n\nOmitted if `version < 4`, or both `vShieldedSpend` and `vShieldedOutput` are empty."
+          },
+          "orchard": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Orchard"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "JSON object with Orchard-specific information.\n\nOmitted if `version < 5`."
+          },
+          "ironwood": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Orchard"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "JSON object with Ironwood-specific information.\n\nIronwood (NU6.3, ZIP 2005) actions are Orchard-shaped, so this has the\nsame shape as the `orchard` field. Omitted if `version < 6`."
+          },
+          "blockhash": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The hash of the block that the transaction is mined in, if any.\n\nOmitted if the transaction is not known to be mined in any block."
+          },
+          "height": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The height of the block that the transaction is mined in, or -1 if that block is\nnot in the current best chain.\n\nOmitted if `blockhash` is either omitted or unknown."
+          },
+          "confirmations": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The number of confirmations the transaction has, or 0 if the block it is mined in\nis not in the current best chain.\n\nOmitted if `blockhash` is either omitted or unknown."
+          },
+          "time": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The transaction time in seconds since epoch (Jan 1 1970 GMT).\n\nThis is always identical to `blocktime`.\n\nOmitted if `blockhash` is either omitted or not in the current best chain."
+          },
+          "blocktime": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The block time in seconds since epoch (Jan 1 1970 GMT) for the block that the\ntransaction is mined in.\n\nOmitted if `blockhash` is either omitted or not in the current best chain."
+          }
+        },
+        "required": [
+          "hex",
+          "txid",
+          "authdigest",
+          "size",
+          "overwintered",
+          "version",
+          "locktime",
+          "vin",
+          "vout"
+        ],
+        "description": "Verbose information about a transaction."
+      },
+      "AccountParameter": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "seedfp": {
+            "type": "string"
+          },
+          "zip32_account_index": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          },
+          "birthday_height": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "name",
+          "seedfp",
+          "zip32_account_index",
+          "birthday_height"
+        ]
+      },
+      "Accounts": {
+        "type": "object",
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Account3"
+            }
+          }
+        },
+        "required": [
+          "accounts"
+        ],
+        "description": "The list of recovered accounts."
+      },
+      "Account3": {
+        "type": "object",
+        "properties": {
+          "account_uuid": {
+            "type": "string",
+            "description": "The account's UUID within this Zallet instance."
+          },
+          "seedfp": {
+            "type": "string"
+          },
+          "zip32_account_index": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The account's ZIP 32 account index."
+          }
+        },
+        "required": [
+          "account_uuid",
+          "seedfp",
+          "zip32_account_index"
+        ]
+      },
+      "ProveResult": {
+        "type": "object",
+        "properties": {
+          "pczt": {
+            "type": "string",
+            "description": "The base64-encoded PCZT with proofs added."
+          },
+          "sapling_proven": {
+            "type": "boolean",
+            "description": "Whether Sapling proofs were created."
+          },
+          "orchard_proven": {
+            "type": "boolean",
+            "description": "Whether the Orchard proof was created."
+          },
+          "ironwood_proven": {
+            "type": "boolean",
+            "description": "Whether the Ironwood proof was created."
+          }
+        },
+        "required": [
+          "pczt",
+          "sapling_proven",
+          "orchard_proven",
+          "ironwood_proven"
+        ],
+        "description": "Result of proving a PCZT."
+      },
+      "GetWalletInfo": {
+        "type": "object",
+        "properties": {
+          "walletversion": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "description": "The wallet version, in its \"Bitcoin client version\" form."
+          },
+          "balance": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The total confirmed transparent balance of the wallet in ZEC."
+          },
+          "unconfirmed_balance": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "The total unconfirmed transparent balance of the wallet in ZEC.\n\nNot included if `asOfHeight` is specified."
+          },
+          "immature_balance": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The total immature transparent balance of the wallet in ZEC."
+          },
+          "shielded_balance": {
+            "type": "string",
+            "description": "The total confirmed shielded balance of the wallet in ZEC."
+          },
+          "shielded_unconfirmed_balance": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The total unconfirmed shielded balance of the wallet in ZEC.\n\nNot included if `asOfHeight` is specified."
+          },
+          "txcount": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "description": "The total number of transactions in the wallet"
+          },
+          "keypoololdest": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "description": "The timestamp (seconds since GMT epoch) of the oldest pre-generated key in the\nkey pool."
+          },
+          "keypoolsize": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "How many new keys are pre-generated."
+          },
+          "unlocked_until": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint64",
+            "minimum": 0,
+            "description": "The timestamp in seconds since epoch (midnight Jan 1 1970 GMT) that the wallet is\nunlocked for transfers, or 0 if the wallet is locked."
+          },
+          "mnemonic_seedfp": {
+            "type": "string",
+            "description": "The BLAKE2b-256 hash of the HD seed derived from the wallet's emergency recovery phrase."
+          }
+        },
+        "required": [
+          "walletversion",
+          "balance",
+          "immature_balance",
+          "shielded_balance",
+          "txcount",
+          "keypoololdest",
+          "keypoolsize",
+          "mnemonic_seedfp"
+        ],
+        "description": "The wallet state information."
+      },
+      "AmountParameter": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "A taddr, zaddr, or Unified Address."
+          },
+          "amount": {
+            "description": "The numeric amount in ZEC."
+          },
+          "memo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "If the address is a zaddr, raw data represented in hexadecimal string format. If\nthe output is being sent to a transparent address, it\u2019s an error to include this\nfield."
+          }
+        },
+        "required": [
+          "address",
+          "amount"
+        ]
+      },
+      "SendResult": {
+        "type": "object",
+        "properties": {
+          "txid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The ID of the resulting transaction, if the payment only produced one.\n\nOmitted if more than one transaction was sent; see [`SendResult::txids`] in that\ncase."
+          },
+          "txids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The IDs of the transactions resulting from the payment.\n\nThese are created and recorded in the wallet regardless of whether they were\nbroadcast; see [`SendResult::broadcast`]."
+          },
+          "broadcast": {
+            "type": "boolean",
+            "description": "Whether the transactions were submitted to the network.\n\n`false` when the `external.broadcast` config option is disabled: the\ntransactions were built and recorded in the wallet, marking their inputs\npending-spent, but never sent. Nothing else in this response distinguishes that\nfrom a completed send, so a client that treats a successful operation as \"the\npayment is on its way\" must check this field."
+          }
+        },
+        "required": [
+          "txids",
+          "broadcast"
+        ],
+        "description": "The result of sending a payment."
+      },
+      "CreateResult": {
+        "type": "object",
+        "properties": {
+          "pczt": {
+            "type": "string",
+            "description": "The base64-encoded PCZT."
+          },
+          "privacy_policy": {
+            "type": "string",
+            "description": "The minimum privacy policy required to execute this PCZT.\n\nAny policy compatible with this one is sufficient; `pczt_sign` requires\nthe caller to acknowledge at least this policy. Inspect this (and the\nPCZT itself) before signing to see what the transaction will reveal."
+          }
+        },
+        "required": [
+          "pczt",
+          "privacy_policy"
+        ],
+        "description": "Result of creating a PCZT."
+      },
+      "BalanceForAccount": {
+        "type": "object",
+        "properties": {
+          "pools": {
+            "$ref": "#/components/schemas/Pools",
+            "description": "The spendable balance held by the account in each value pool.\n\nPools for which the balance is zero are omitted."
+          },
+          "minimum_confirmations": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The `minconf` argument used to compute these balances."
+          }
+        },
+        "required": [
+          "pools",
+          "minimum_confirmations"
+        ],
+        "description": "The spendable balance of an account, split by value pool."
+      },
+      "Pools": {
+        "type": "object",
+        "properties": {
+          "transparent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PoolBalance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The amount held by the account in the transparent value pool.\n\nOmitted if zero."
+          },
+          "sapling": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PoolBalance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The amount held by the account in the Sapling value pool.\n\nOmitted if zero."
+          },
+          "orchard": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PoolBalance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The amount held by the account in the Orchard value pool.\n\nOmitted if zero."
+          },
+          "ironwood": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PoolBalance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The amount held by the account in the Ironwood value pool.\n\nIronwood (NU6.3, ZIP 2005) notes are Orchard-shaped; funds received to an\nOrchard receiver once NU6.3 is active are reported here rather than under\n`orchard`. Omitted if zero."
+          }
+        }
+      },
+      "PoolBalance": {
+        "type": "object",
+        "properties": {
+          "valueZat": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "description": "The balance in zatoshis."
+          }
+        },
+        "required": [
+          "valueZat"
+        ]
+      },
+      "Account4": {
+        "type": "object",
+        "properties": {
+          "account_uuid": {
+            "type": "string",
+            "description": "The account's UUID within this Zallet instance."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The account name.\n\nOmitted if the account has no configured name."
+          },
+          "seedfp": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The account's seed fingerprint.\n\nOmitted if the account has no known derivation information."
+          },
+          "zip32_account_index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The account's ZIP 32 account index.\n\nOmitted if the account has no known derivation information."
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Address2"
+            },
+            "description": "The addresses known to the wallet for this account."
+          }
+        },
+        "required": [
+          "account_uuid",
+          "addresses"
+        ],
+        "description": "Information about an account."
+      },
+      "ResultType15": {
+        "type": "object",
+        "properties": {
+          "asm": {
+            "type": "string",
+            "description": "The assembly string representation of the script."
+          },
+          "reqSigs": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint8",
+            "minimum": 0,
+            "maximum": 255,
+            "description": "The required number of signatures to spend this output.\n\nOmitted for scripts that don't contain identifiable addresses (such as\nnon-standard or null-data scripts)."
+          },
+          "type": {
+            "type": "string",
+            "description": "The type of script.\n\nOne of `[\"pubkey\", \"pubkeyhash\", \"scripthash\", \"multisig\", \"nulldata\", \"nonstandard\"]`."
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of the transparent addresses involved in the script.\n\nOmitted for scripts that don't contain identifiable addresses (such as\nnon-standard or null-data scripts)."
+          },
+          "p2sh": {
+            "type": "string",
+            "description": "The P2SH address for this script."
+          }
+        },
+        "required": [
+          "asm",
+          "type",
+          "addresses",
+          "p2sh"
+        ],
+        "description": "The result of decoding a script."
+      },
+      "Transaction2": {
+        "type": "object",
+        "properties": {
+          "txid": {
+            "type": "string",
+            "description": "The transaction ID."
+          },
+          "status": {
+            "type": "string",
+            "description": "The transaction status.\n\nOne of 'mined', 'waiting', 'expiringsoon' or 'expired'."
+          },
+          "confirmations": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The number of confirmations.\n\n- A positive value is the number of blocks that have been mined including the\n  transaction in the chain. For example, 1 confirmation means the transaction is\n  in the block currently at the chain tip.\n- 0 means the transaction is in the mempool. If `asOfHeight` was set, this case\n  will not occur.\n- -1 means the transaction cannot be mined."
+          },
+          "blockhash": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The hash of the main chain block that this transaction is mined in.\n\nOmitted if this transaction is not mined within a block in the current best chain."
+          },
+          "blockindex": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The index of the transaction within its block's `vtx` field.\n\nOmitted if this transaction is not mined within a block in the current best chain."
+          },
+          "blocktime": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint64",
+            "minimum": 0,
+            "description": "The time in seconds since epoch (1 Jan 1970 GMT) that the main chain block\ncontaining this transaction was mined.\n\nOmitted if this transaction is not mined within a block in the current best chain."
+          },
+          "version": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The transaction version."
+          },
+          "expiryheight": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "description": "The greatest height at which this transaction can be mined, or 0 if this\ntransaction does not expire."
+          },
+          "fee": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "The fee paid by the transaction.\n\nOmitted if this is a coinbase transaction, or if the fee cannot be determined\nbecause one or more transparent inputs of the transaction cannot be found."
+          },
+          "generated": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Set to `true` if this is a coinbase transaction, omitted otherwise."
+          },
+          "spends": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Spend"
+            },
+            "description": "The inputs to the transaction that the wallet is capable of viewing."
+          },
+          "outputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Output"
+            },
+            "description": "The outputs of the transaction that the wallet is capable of viewing."
+          },
+          "accounts": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AccountEffect"
+            },
+            "description": "A map from an involved account's UUID to the effects of this transaction on it."
+          }
+        },
+        "required": [
+          "txid",
+          "status",
+          "confirmations",
+          "version",
+          "expiryheight",
+          "spends",
+          "outputs",
+          "accounts"
+        ],
+        "description": "Detailed information about an in-wallet transaction."
+      },
+      "Spend": {
+        "type": "object",
+        "properties": {
+          "pool": {
+            "type": "string",
+            "description": "The value pool.\n\nOne of `[\"transparent\", \"sapling\", \"orchard\", \"ironwood\"]`."
+          },
+          "tIn": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "(transparent) the index of the spend within `vin`."
+          },
+          "spend": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "(sapling) the index of the spend within `vShieldedSpend`."
+          },
+          "action": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "(orchard) the index of the action within orchard bundle."
+          },
+          "txidPrev": {
+            "type": "string",
+            "description": "The id for the transaction this note was created in."
+          },
+          "tOutPrev": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint32",
+            "minimum": 0,
+            "description": "(transparent) the index of the corresponding output within the previous\ntransaction's `vout`."
+          },
+          "outputPrev": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "(sapling) the index of the corresponding output within the previous transaction's\n`vShieldedOutput`."
+          },
+          "actionPrev": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "(orchard) the index of the corresponding action within the previous transaction's\nOrchard bundle."
+          },
+          "account_uuid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The UUID of the Zallet account that received the corresponding output.\n\nOmitted if the output is not for an account in the wallet (which always means that\n`pool` is `\"transparent\"`; external shielded spends are never included because\nthey are unviewable)."
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Zcash address involved in the transaction.\n\nOmitted if this note was received on an account-internal address (e.g. change\nnotes)."
+          },
+          "value": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The amount in ZEC."
+          },
+          "valueZat": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "description": "The amount in zatoshis."
+          }
+        },
+        "required": [
+          "pool",
+          "txidPrev",
+          "value",
+          "valueZat"
+        ]
+      },
+      "Output": {
+        "type": "object",
+        "properties": {
+          "pool": {
+            "type": "string",
+            "description": "The value pool.\n\nOne of `[\"transparent\", \"sapling\", \"orchard\", \"ironwood\"]`."
+          },
+          "tOut": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "(transparent) the index of the output within the `vout`."
+          },
+          "output": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "(sapling) the index of the output within the `vShieldedOutput`."
+          },
+          "action": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint16",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "(orchard) the index of the action within the orchard bundle."
+          },
+          "account_uuid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The UUID of the Zallet account that received the output.\n\nOmitted if the output is not for an account in the wallet (`outgoing != false`)."
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The Zcash address that received the output.\n\nOmitted if this output was received on an account-internal address (e.g. change outputs),\nor is a transparent output to a script that is not either P2PKH or P2SH (and thus doesn't\nhave an address encoding)."
+          },
+          "outgoing": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Whether or not the output is outgoing from this wallet.\n\n- `true` if the output is not for an account in the wallet, and the transaction\n  was funded by the wallet.\n- `false` if the output is for an account in the wallet.\n\nOmitted if the output is not for an account in the wallet, and the transaction was\nnot funded by the wallet."
+          },
+          "walletInternal": {
+            "type": "boolean",
+            "description": "`true` if the output was received by the account's internal viewing key.\n\nThe `address` field is guaranteed be absent when this field is set to `true`, in which case\nit indicates that this may be a change output, an output of a wallet-internal shielding\ntransaction, an output of a wallet-internal cross-account transfer, or otherwise is the\nresult of some wallet-internal operation."
+          },
+          "value": {
+            "type": "number",
+            "minimum": 0,
+            "description": "The value of the output in ZEC."
+          },
+          "valueZat": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "description": "The value of the output in zatoshis."
+          },
+          "memo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Hexadecimal string representation of the memo field.\n\nOmitted if this is a transparent output."
+          },
+          "memoStr": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "UTF-8 string representation of memo field (if it contains valid UTF-8).\n\nOmitted if this is a transparent output."
+          }
+        },
+        "required": [
+          "pool",
+          "walletInternal",
+          "value",
+          "valueZat"
+        ]
+      },
+      "AccountEffect": {
+        "type": "object",
+        "properties": {
+          "delta": {
+            "type": "number",
+            "description": "The net change of the account's balance, in ZEC.\n\nThis includes any contribution by this account to the transaction fee."
+          },
+          "deltaZat": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The net change of the account's balance, in zatoshis.\n\nThis includes any contribution by this account to the transaction fee."
+          }
+        },
+        "required": [
+          "delta",
+          "deltaZat"
+        ],
+        "description": "The effect of a transaction on an account's balance."
+      },
+      "ResultType16": {
+        "type": "string",
+        "description": "The exported Sapling extended spending key, encoded as a Bech32 string."
+      },
+      "InspectResult": {
+        "type": "object",
+        "properties": {
+          "tx_version": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The transaction version."
+          },
+          "consensus_branch_id": {
+            "type": "string",
+            "description": "The consensus branch the transaction commits to, as hex."
+          },
+          "expiry_height": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The block height after which the transaction can no longer be mined."
+          },
+          "privacy_policy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The minimum privacy policy the transaction requires, as recorded by\n`pczt_create`. Absent for a PCZT created elsewhere."
+          },
+          "signing_hints": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SigningHintsInfo"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The account signing hints recorded by `pczt_create`, if any."
+          },
+          "wallet_created": {
+            "type": "boolean",
+            "description": "Whether this wallet's backend created the PCZT (and can therefore\nrecord the extracted transaction; see `pczt_extract`)."
+          },
+          "fee_zat": {
+            "type": "integer",
+            "format": "int128",
+            "description": "The transaction fee implied by the recorded values, in zatoshis:\ntransparent inputs minus transparent outputs, plus each shielded\nbundle's net value balance. Relies on the creator-claimed transparent\ninput values, which are not verified here."
+          },
+          "transparent": {
+            "$ref": "#/components/schemas/TransparentInfo",
+            "description": "The transparent inputs and outputs."
+          },
+          "sapling": {
+            "$ref": "#/components/schemas/SaplingInfo",
+            "description": "The Sapling bundle."
+          },
+          "orchard": {
+            "$ref": "#/components/schemas/OrchardInfo",
+            "description": "The Orchard bundle."
+          },
+          "ironwood": {
+            "$ref": "#/components/schemas/OrchardInfo",
+            "description": "The Ironwood bundle."
+          }
+        },
+        "required": [
+          "tx_version",
+          "consensus_branch_id",
+          "expiry_height",
+          "wallet_created",
+          "fee_zat",
+          "transparent",
+          "sapling",
+          "orchard",
+          "ironwood"
+        ],
+        "description": "Description of a PCZT."
+      },
+      "SigningHintsInfo": {
+        "type": "object",
+        "properties": {
+          "seed_fingerprint": {
+            "type": "string",
+            "description": "The fingerprint of the wallet seed whose keys should sign."
+          },
+          "account_index": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The ZIP 32 account index within that seed."
+          }
+        },
+        "required": [
+          "seed_fingerprint",
+          "account_index"
+        ],
+        "description": "The account signing hints recorded in the PCZT by `pczt_create`."
+      },
+      "TransparentInfo": {
+        "type": "object",
+        "properties": {
+          "inputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransparentInputInfo"
+            },
+            "description": "The transparent inputs."
+          },
+          "outputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransparentOutputInfo"
+            },
+            "description": "The transparent outputs."
+          }
+        },
+        "required": [
+          "inputs",
+          "outputs"
+        ],
+        "description": "The transparent half of the PCZT."
+      },
+      "TransparentInputInfo": {
+        "type": "object",
+        "properties": {
+          "prevout_txid": {
+            "type": "string",
+            "description": "The ID of the transaction whose output is being spent."
+          },
+          "prevout_index": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The index of the output being spent."
+          },
+          "value_zat": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "description": "The value of the output being spent, in zatoshis, as claimed by the\nPCZT's creator."
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The address the spent output was received at, when its script is a\nstandard one."
+          }
+        },
+        "required": [
+          "prevout_txid",
+          "prevout_index",
+          "value_zat"
+        ],
+        "description": "A transparent input of the PCZT."
+      },
+      "TransparentOutputInfo": {
+        "type": "object",
+        "properties": {
+          "value_zat": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "description": "The value of the output, in zatoshis."
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The recipient address, when the output script is a standard one."
+          },
+          "user_address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The user-facing address this output pays, as recorded by the creator\n(e.g. the unified address whose transparent receiver `address` is)."
+          }
+        },
+        "required": [
+          "value_zat"
+        ],
+        "description": "A transparent output of the PCZT."
+      },
+      "SaplingInfo": {
+        "type": "object",
+        "properties": {
+          "spends": {
+            "type": "integer",
+            "format": "uint",
+            "minimum": 0,
+            "description": "The number of Sapling spends."
+          },
+          "outputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShieldedOutputInfo"
+            },
+            "description": "The Sapling outputs."
+          },
+          "value_balance_zat": {
+            "type": "integer",
+            "format": "int128",
+            "description": "The net value of Sapling spends minus outputs, in zatoshis."
+          },
+          "proofs_complete": {
+            "type": "boolean",
+            "description": "Whether every required Sapling proof is present."
+          }
+        },
+        "required": [
+          "spends",
+          "outputs",
+          "value_balance_zat",
+          "proofs_complete"
+        ],
+        "description": "The Sapling bundle of the PCZT."
+      },
+      "ShieldedOutputInfo": {
+        "type": "object",
+        "properties": {
+          "value_zat": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint64",
+            "minimum": 0,
+            "description": "The value of the output, in zatoshis, if recorded."
+          },
+          "user_address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The user-facing address this output pays, if recorded."
+          }
+        },
+        "description": "A shielded output of the PCZT, as recorded by its creator.\n\nThese fields are optional in the PCZT format and may have been redacted;\nan on-chain observer cannot recover them, and neither can this method."
+      },
+      "OrchardInfo": {
+        "type": "object",
+        "properties": {
+          "actions": {
+            "type": "integer",
+            "format": "uint",
+            "minimum": 0,
+            "description": "The number of actions."
+          },
+          "signed_actions": {
+            "type": "integer",
+            "format": "uint",
+            "minimum": 0,
+            "description": "The number of actions that carry a spend-auth signature (including the\npadding dummies signed at creation)."
+          },
+          "outputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShieldedOutputInfo"
+            },
+            "description": "The outputs of the actions."
+          },
+          "value_balance_zat": {
+            "type": "integer",
+            "format": "int128",
+            "description": "The net value of spends minus outputs, in zatoshis."
+          },
+          "proof_complete": {
+            "type": "boolean",
+            "description": "Whether the bundle proof is present (or no proof is required)."
+          }
+        },
+        "required": [
+          "actions",
+          "signed_actions",
+          "outputs",
+          "value_balance_zat",
+          "proof_complete"
+        ],
+        "description": "An Orchard-family (Orchard or Ironwood) bundle of the PCZT."
+      },
+      "ResultType17": {
+        "type": "string",
+        "description": "The TEX address encoding of the input transparent P2PKH address."
+      },
+      "ResultType18": {
+        "type": "string",
+        "description": "The help response."
+      },
+      "ResultType19": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/WalletTx"
+        },
+        "description": "A list of transactions involving the wallet."
+      },
+      "WalletTx": {
+        "type": "object",
+        "properties": {
+          "account_uuid": {
+            "type": "string",
+            "description": "The UUID of the account that this transaction entry is acting on.\n\nA transaction that has effects on multiple accounts will have multiple rows in the result."
+          },
+          "mined_height": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The height at which the transaction was mined"
+          },
+          "txid": {
+            "type": "string",
+            "description": "The transaction identifier"
+          },
+          "expiry_height": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint32",
+            "minimum": 0,
+            "description": "The expiry height of the transaction"
+          },
+          "account_balance_delta": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The delta to the account produced by the transaction"
+          },
+          "fee_paid": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint64",
+            "minimum": 0,
+            "description": "The fee paid by the transaction, if known."
+          },
+          "sent_note_count": {
+            "type": "integer",
+            "format": "uint",
+            "minimum": 0,
+            "description": "The number of outputs produced by the transaction."
+          },
+          "received_note_count": {
+            "type": "integer",
+            "format": "uint",
+            "minimum": 0,
+            "description": "The number of outputs received by the transaction."
+          },
+          "block_time": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The timestamp at which the block was mined."
+          },
+          "block_datetime": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The human-readable datetime at which the block was mined."
+          },
+          "expired_unmined": {
+            "type": "boolean",
+            "description": "Whether or not the transaction expired without having been mined."
+          },
+          "outputs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WalletTxOutput"
+            },
+            "description": "The outputs of the transaction received by the wallet."
+          }
+        },
+        "required": [
+          "account_uuid",
+          "txid",
+          "account_balance_delta",
+          "sent_note_count",
+          "received_note_count",
+          "expired_unmined",
+          "outputs"
+        ],
+        "description": "A transaction that affects an account in a wallet."
+      },
+      "WalletTxOutput": {
+        "type": "object",
+        "properties": {
+          "pool": {
+            "type": "string"
+          },
+          "output_index": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          },
+          "from_account": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to_account": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to_address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          },
+          "is_change": {
+            "type": "boolean"
+          },
+          "memo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "pool",
+          "output_index",
+          "value",
+          "is_change"
+        ],
+        "description": "Basic information about a transaction output that was either created or received by this\nwallet."
+      },
+      "ValidateAddress": {
+        "type": "object",
+        "properties": {
+          "isvalid": {
+            "type": "boolean",
+            "description": "Whether the address is valid."
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The normalized address string."
+          },
+          "scriptPubKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The hex-encoded scriptPubKey generated for the address."
+          },
+          "isscript": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Whether the address is a P2SH (script) address."
+          }
+        },
+        "required": [
+          "isvalid"
+        ],
+        "description": "The result of validating a transparent Zcash address."
+      },
+      "ResultType20": {
+        "type": "null",
+        "description": "Empty result indicating success."
+      },
+      "OpenRPC Schema": {
+        "$ref": "https://raw.githubusercontent.com/open-rpc/meta-schema/master/schema.json"
+      },
+      "SignResult": {
+        "type": "object",
+        "properties": {
+          "pczt": {
+            "type": "string",
+            "description": "The base64-encoded signed PCZT."
+          },
+          "transparent_signed": {
+            "type": "integer",
+            "format": "uint",
+            "minimum": 0,
+            "description": "Number of transparent inputs signed."
+          },
+          "sapling_signed": {
+            "type": "integer",
+            "format": "uint",
+            "minimum": 0,
+            "description": "Number of Sapling spends signed."
+          },
+          "orchard_signed": {
+            "type": "integer",
+            "format": "uint",
+            "minimum": 0,
+            "description": "Number of Orchard actions signed.\n\nActions that already carried a signature (a previous signer's, or the\npadding dummies signed when the PCZT was created) are not counted here,\nnor reported as unsigned."
+          },
+          "ironwood_signed": {
+            "type": "integer",
+            "format": "uint",
+            "minimum": 0,
+            "description": "Number of Ironwood actions signed, under the same accounting as\n`orchard_signed`."
+          },
+          "unsigned_transparent": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "description": "Indices of transparent inputs that could not be signed."
+          },
+          "unsigned_sapling": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "description": "Indices of Sapling spends that could not be signed."
+          },
+          "unsigned_orchard": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "description": "Indices of Orchard actions that could not be signed."
+          },
+          "unsigned_ironwood": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "description": "Indices of Ironwood actions that could not be signed."
+          }
+        },
+        "required": [
+          "pczt",
+          "transparent_signed",
+          "sapling_signed",
+          "orchard_signed",
+          "ironwood_signed",
+          "unsigned_transparent",
+          "unsigned_sapling",
+          "unsigned_orchard",
+          "unsigned_ironwood"
+        ],
+        "description": "Result of signing a PCZT."
+      }
+    }
+  }
+}

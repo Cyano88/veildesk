@@ -1,0 +1,37 @@
+{
+  "name": "veildesk",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "demo": "node scripts/demo.mjs",
+    "relay": "node scripts/relay-server.mjs",
+    "provider": "node scripts/provider-worker.mjs",
+    "acceptance": "node scripts/acceptance.mjs"
+  },
+  "engines": {
+    "node": ">=24.14.0 <25"
+  },
+  "exports": {
+    "./client": "./src/client.mjs",
+    "./mandate-client": "./src/mandate-client.mjs"
+  },
+  "files": [
+    "src",
+    "scripts",
+    "tests",
+    "docs",
+    "ops",
+    "examples",
+    "web",
+    "server.mjs",
+    "Dockerfile",
+    "render.yaml",
+    "README.md",
+    ".dockerignore"
+  ]
+}
+
+

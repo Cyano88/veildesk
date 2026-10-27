@@ -1,0 +1,14 @@
+*
+!Dockerfile
+!package.json
+!src/
+!src/**
+!scripts/
+!scripts/relay-server.mjs
+!scripts/provider-worker.mjs
+!scripts/provision-relay.mjs
+!scripts/checkpoint.mjs
+!scripts/payment-backup.mjs
+!scripts/backup-relay.mjs
+!scripts/payment-preflight.mjs
+!scripts/mandate-client.mjs

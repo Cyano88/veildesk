@@ -1,0 +1,37 @@
+// Local-only bounded load experiment. Never contacts a wallet or public service.
+import assert from 'node:assert/strict';import {spawn} from 'node:child_process';import {once} from 'node:events';import {mkdtemp,readFile,writeFile,mkdir,rm,stat} from 'node:fs/promises';import {tmpdir,cpus} from 'node:os';import {join} from 'node:path';import {fileURLToPath} from 'node:url';import {randomUUID,createHash} from 'node:crypto';import {setTimeout as delay} from 'node:timers/promises';import {DatabaseSync} from 'node:sqlite';
+import {relayClient,preparePrivateJob,openPrivateResult} from '../src/client.mjs';import {loadEndpointIdentity} from '../src/endpoint-identity.mjs';import {processClaim} from '../src/provider.mjs';
+const root=fileURLToPath(new URL('../',import.meta.url)),directory=await mkdtemp(join(tmpdir(),'veildesk-load-')),count=300,concurrency=10,maxPending=32,maxRecords=count+64;
+const read=async p=>JSON.parse(await readFile(p,'utf8'));let child,url;const latency=[],statuses={},checks=[];const accepted=[],requests=[];
+const report={schema:'veildesk.load-acceptance.v1',startedAt:new Date().toISOString(),runtime:process.version,platform:process.platform,cpu:cpus()[0]?.model,configuration:{count,concurrency,maxPending,maxRecords,maxRequestsPerMinute:100000,batchIntervalMs:1000},scope:'Local loopback relay in a separate process; concurrent provider functions in load generator, not the production polling worker. No TLS, wallets, payments or marketplace calls.',passed:false};
+async function run(args){const p=spawn(process.execPath,args,{cwd:root,stdio:['ignore','ignore','pipe']});let error='';p.stderr.on('data',b=>error+=b);const [code]=await once(p,'exit');assert.equal(code,0,error)}
+async function start(){child=spawn(process.execPath,['scripts/relay-server.mjs'],{cwd:root,env:{...process.env,VEILDESK_RELAY_CONFIG:join(directory,'private','relay.json'),PORT:'0'},stdio:['ignore','pipe','pipe']});child.stderr.resume();url=await new Promise((resolve,reject)=>{let out='';const timer=setTimeout(()=>reject(Error('Relay startup timeout')),10000);child.once('exit',()=>{clearTimeout(timer);reject(Error('Relay exited'))});child.stdout.on('data',b=>{out+=b;if(out.includes('\n')){clearTimeout(timer);resolve('http://127.0.0.1:'+JSON.parse(out.split('\n')[0]).port)}})})}
+async function stop(){if(!child||child.exitCode!==null)return;const done=once(child,'exit');child.kill();await done;child=null}
+function measured(config){return async(path,options)=>{const started=performance.now();try{const value=await relayClient({...config,url})(path,options);statuses.ok=(statuses.ok||0)+1;return value}catch(e){statuses[e.status||'transport']=(statuses[e.status||'transport']||0)+1;throw e}finally{latency.push(performance.now()-started)}}}
+async function batch(items,fn){for(let i=0;i<items.length;i+=concurrency)await Promise.all(items.slice(i,i+concurrency).map(fn))}
+try{
+ await run(['scripts/provision-relay.mjs',join(directory,'private')]);const config=await read(join(directory,'private','relay.json'));Object.assign(config,{maxPending,maxRecords,maxRequestsPerMinute:100000});await writeFile(join(directory,'private','relay.json'),JSON.stringify(config));
+ const clientConfig=await read(join(directory,'private','client.json')),providerConfig=await read(join(directory,'private','provider.json')),clientKeys=await loadEndpointIdentity(clientConfig.identity),providerKeys=await loadEndpointIdentity(providerConfig.identity);
+ await start();const client=measured(clientConfig),provider=measured(providerConfig);
+ const make=async()=>{const id=randomUUID(),expiresAt=Date.now()+600000;return preparePrivateJob({id,expiresAt,provider:clientConfig.provider,capability:'prediction.mandate.validate.v1',signer:clientKeys.signer,payload:{schema:'veildesk.mandate.v1',id,mode:'dry_run',market:'load-private-marker',side:'YES',maxSpendUsd:'1.00',limitPrice:'0.5',expiresAt,approval:'preview_only'}})};
+ const submit=async body=>{const value=await client('/v1/jobs',{method:'POST',body});accepted.push(body.id);requests.push(body);return value};
+ const processOne=async()=>{const {job}=await provider('/v1/provider/claim',{method:'POST',body:{}});assert.ok(job);await processClaim(job,{...providerConfig,...providerKeys,rpc:provider})};
+ const verify=async id=>{const job=await client('/v1/jobs/'+id);assert.equal(job.state,'completed');const result=await openPrivateResult(job,{recipient:clientKeys.recipient,expectedSigner:providerKeys.signer.publicKey});assert.equal(result.payload.status,'validated');assert.equal(result.payload.mandate.id,id);assert.equal(result.executionAuthorized,false)};
+ const initial=await Promise.all(Array.from({length:maxPending},make));await batch(initial,submit);
+ await assert.rejects(client('/v1/jobs',{method:'POST',body:await make()}),e=>e.status===429);checks.push('pending_quota_429');
+ await batch(initial,processOne);await batch(accepted,verify);checks.push('accepted_jobs_survive_pending_overload');
+ const started=performance.now();
+ for(let n=0;n<count;n+=concurrency){const tick=performance.now(),bodies=await Promise.all(Array.from({length:concurrency},make));await Promise.all(bodies.map(submit));await Promise.all(bodies.map(processOne));await Promise.all(bodies.map(b=>verify(b.id)));await delay(Math.max(0,1000-(performance.now()-tick)))}
+ report.workload={jobs:count,durationMs:performance.now()-started,jobsPerSecond:count/((performance.now()-started)/1000)};checks.push('300_authenticated_jobs_verified');
+ const completedIds=[...accepted],fill=await Promise.all(Array.from({length:32},make));await batch(fill,submit);
+ await assert.rejects(client('/v1/jobs',{method:'POST',body:await make()}),e=>e.status===503);checks.push('storage_capacity_503');
+ await stop();await start();await batch(completedIds,verify);await batch(fill,async b=>assert.equal((await client('/v1/jobs/'+b.id)).state,'queued'));
+ assert.equal((await client('/v1/jobs',{method:'POST',body:requests[0]})).state,'completed');checks.push('all_364_records_survive_restart','replay_at_capacity');
+ await stop();const db=new DatabaseSync(config.database,{readOnly:true});try{assert.equal(db.prepare('PRAGMA integrity_check').get().integrity_check,'ok');assert.equal(db.prepare('SELECT count(*) AS n FROM relay_jobs').get().n,maxRecords)}finally{db.close()}
+ assert.equal((await readFile(config.database)).includes(Buffer.from('load-private-marker')),false);checks.push('sqlite_integrity','no_plaintext_marker');
+ latency.sort((a,b)=>a-b);report.http={requests:latency.length,statuses,p50Ms:latency[Math.floor(latency.length*.5)],p95Ms:latency[Math.floor(latency.length*.95)],p99Ms:latency[Math.floor(latency.length*.99)],maxMs:latency.at(-1)};report.databaseBytes=(await stat(config.database)).size;report.checks=checks;report.passed=true;
+}catch(error){report.error=error.message;process.exitCode=1}
+finally{
+ await stop();report.finishedAt=new Date().toISOString();report.sourceHashes={};for(const path of ['src/relay.mjs','src/provider.mjs','src/client.mjs','scripts/relay-server.mjs','scripts/load-acceptance.mjs'])report.sourceHashes[path]=createHash('sha256').update(await readFile(join(root,path))).digest('hex');
+ await mkdir(join(root,'output'),{recursive:true});const file=join(root,'output','load-acceptance-'+report.startedAt.replace(/[:.]/g,'-')+'.json');await writeFile(file,JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));console.log('Evidence: '+file);await rm(directory,{recursive:true,force:true});
+}

@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: veildesk-relay
+    runtime: node
+    region: oregon
+    plan: starter
+    numInstances: 1
+    autoDeployTrigger: off
+    buildCommand: node --check scripts/render-start.mjs
+    startCommand: node scripts/render-start.mjs relay
+    healthCheckPath: /healthz
+    disk:
+      name: veildesk-relay-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: 24.14.1
+      - key: VEILDESK_CONFIG_JSON
+        sync: false
+  - type: worker
+    name: veildesk-provider
+    runtime: node
+    region: oregon
+    plan: starter
+    numInstances: 1
+    autoDeployTrigger: off
+    buildCommand: node --check scripts/render-start.mjs
+    startCommand: node scripts/render-start.mjs provider
+    disk:
+      name: veildesk-provider-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: 24.14.1
+      - key: VEILDESK_CONFIG_JSON
+        sync: false
+      - key: VEILDESK_RELAY_URL
+        sync: false

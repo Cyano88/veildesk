@@ -1,0 +1,47 @@
+{
+    "schema":  "veildesk.public-transaction-shape.v1",
+    "source":  "https://zcash-testnet-zebrad.gateway.tatum.io",
+    "blockHeight":  4545850,
+    "blockHash":  "00001df81aa044eec27045e3ca6b7bcf3fdfb21b06d2969a96cc15874166aab9",
+    "recipientEvidence":  false,
+    "transaction":  {
+                        "txid":  "9fa44df4980c1475a1ea70cc7f1982d3bf3381b722cdf0e1bc591d3c9ad1f1ef",
+                        "version":  6,
+                        "versiongroupid":  "d884b698",
+                        "vin":  [
+
+                                ],
+                        "vout":  [
+
+                                 ],
+                        "vjoinsplit":  [
+
+                                       ],
+                        "vShieldedSpend":  [
+
+                                           ],
+                        "vShieldedOutput":  [
+
+                                            ],
+                        "orchard":  {
+                                        "actions":  [
+
+                                                    ],
+                                        "flags":  null
+                                    },
+                        "ironwood":  {
+                                         "actions":  [
+                                                         {
+
+                                                         },
+                                                         {
+
+                                                         }
+                                                     ],
+                                         "flags":  {
+                                                       "enableOutputs":  true,
+                                                       "enableSpends":  true
+                                                   }
+                                     }
+                    }
+}

@@ -1,0 +1,12 @@
+import {readFile,mkdir,chmod} from 'node:fs/promises';
+import {dirname,resolve} from 'node:path';
+import {createRelay} from '../src/relay.mjs';
+const path=process.env.VEILDESK_RELAY_CONFIG;if(!path)throw Error('Set VEILDESK_RELAY_CONFIG to an operator-owned JSON configuration');
+const config=JSON.parse(await readFile(path,'utf8'));
+process.umask(0o077);
+const database=resolve(config.database);await mkdir(dirname(database),{recursive:true,mode:0o700});
+const relay=createRelay({...config,database});await chmod(database,0o600);
+const host=process.env.VEILDESK_BIND||'127.0.0.1',port=Number(process.env.PORT||5181);
+if(!['127.0.0.1','::1'].includes(host)&&process.env.VEILDESK_BEHIND_TLS_PROXY!=='true')throw Error('Public binding requires VEILDESK_BEHIND_TLS_PROXY=true and a TLS reverse proxy');
+relay.server.listen(port,host,()=>console.log(JSON.stringify({service:'veildesk-relay',host,port:relay.server.address().port,paymentSettlement:false,tradeExecution:false})));
+let closing=false;for(const signal of ['SIGINT','SIGTERM'])process.on(signal,async()=>{if(closing)return;closing=true;await relay.close();process.exit(0)});
