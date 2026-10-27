@@ -1,0 +1,61 @@
+name: Probe cloud light wallet interface
+on:
+  workflow_run:
+    workflows: [Build cloud light wallet candidate]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: Successful pinned build run ID
+        required: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  probe:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: cloud-light-wallet-candidate
+          path: wallet-build
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.build_run_id || github.event.workflow_run.id }}
+      - name: Verify pinned binary artifact
+        run: |
+          test "$(cat wallet-build/source-commit.txt)" = bfb0a2156819ea7f75a9b09b1724abfd06c8925e
+          sha256sum -c wallet-build/sha256.txt
+          chmod 700 wallet-build/zingo-cli
+      - name: Probe an unfunded offline testnet wallet without logging secrets
+        shell: python
+        run: |
+          import json, os, subprocess, tempfile, pathlib
+          os.umask(0o077)
+          binary=str(pathlib.Path('wallet-build/zingo-cli').resolve())
+          results=[]
+          with tempfile.TemporaryDirectory(prefix='veildesk-wallet-probe-') as directory:
+              for command in [['notes','all'],['transactions'],['height']]:
+                  try:
+                      result=subprocess.run([binary,'--chain','testnet','--data-dir',directory,'--offline',*command],capture_output=True,text=True,timeout=90)
+                      record={'command':command[0],'exitCode':result.returncode,'json':False}
+                      if result.returncode==0:
+                          try:
+                              data=json.loads(result.stdout)
+                              record['json']=True
+                              record['shape']='object' if isinstance(data,dict) else 'array' if isinstance(data,list) else 'scalar'
+                          except (ValueError,TypeError): pass
+                  except subprocess.TimeoutExpired:
+                      record={'command':command[0],'timeout':True,'json':False}
+                  results.append(record)
+          evidence={'sourceCommit':'bfb0a2156819ea7f75a9b09b1724abfd06c8925e','network':'testnet','offline':True,'funded':False,'settlementVerified':False,'checks':results}
+          pathlib.Path('wallet-probe.json').write_text(json.dumps(evidence,indent=2))
+          print(json.dumps(evidence))
+          if not all(r.get('exitCode')==0 and r['json'] for r in results): raise SystemExit(1)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: light-wallet-interface-evidence
+          path: wallet-probe.json
+          retention-days: 7
