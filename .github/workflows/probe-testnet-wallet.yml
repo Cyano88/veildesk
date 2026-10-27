@@ -1,31 +1,40 @@
 name: Probe cloud testnet wallet sync
 on:
+  workflow_run:
+    workflows: [Build cloud light wallet kit]
+    types: [completed]
   workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: Successful cloud wallet kit build
+        required: true
 permissions:
   contents: read
   actions: read
 jobs:
   probe:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: cloud-light-wallet-candidate
+          name: cloud-light-wallet-kit
           path: wallet-build
           github-token: ${{ github.token }}
-          run-id: 40587481697
+          run-id: ${{ inputs.build_run_id || github.event.workflow_run.id }}
       - name: Verify binary
         run: |
           test "$(cat wallet-build/source-commit.txt)" = bfb0a2156819ea7f75a9b09b1724abfd06c8925e
           sha256sum -c wallet-build/sha256.txt
-          chmod 700 wallet-build/zingo-cli
+          chmod 700 wallet-build/zingo-cli wallet-build/nym-proxy
       - name: Inspect testnet with a fresh unfunded wallet
         shell: python
         run: |
           import json, os, subprocess, tempfile, pathlib, time
           os.umask(0o077)
           binary=str(pathlib.Path('wallet-build/zingo-cli').resolve())
+          os.environ['ZINGO_NYM_PROXY']=str(pathlib.Path('wallet-build/nym-proxy').resolve())
           checks=[]
           with tempfile.TemporaryDirectory(prefix='veildesk-testnet-probe-') as directory:
               base=[binary,'--chain','testnet','--data-dir',directory]

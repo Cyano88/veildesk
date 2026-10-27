@@ -1,0 +1,42 @@
+name: Build cloud light wallet kit
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: zingolabs/zingolib
+          ref: bfb0a2156819ea7f75a9b09b1724abfd06c8925e
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cloud-light-wallet-candidate
+          path: wallet-build
+          github-token: ${{ github.token }}
+          run-id: 40587481697
+      - name: Verify existing wallet executable
+        run: |
+          test "$(cat wallet-build/source-commit.txt)" = bfb0a2156819ea7f75a9b09b1724abfd06c8925e
+          sha256sum -c wallet-build/sha256.txt
+      - name: Build supported network proxy on runner
+        env:
+          CARGO_BUILD_JOBS: 2
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler pkg-config libssl-dev clang
+          rustup toolchain install 1.99.0 --profile minimal
+          cargo +1.99.0 build --manifest-path zingo-netutils/Cargo.toml --locked --release --features nym --bin nym-proxy
+          cp zingo-netutils/target/release/nym-proxy wallet-build/nym-proxy
+          sha256sum wallet-build/zingo-cli wallet-build/nym-proxy > wallet-build/sha256.txt
+          ldd wallet-build/nym-proxy > wallet-build/proxy-runtime-libraries.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cloud-light-wallet-kit
+          path: wallet-build/
+          retention-days: 3
