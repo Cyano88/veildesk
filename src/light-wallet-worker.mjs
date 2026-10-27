@@ -43,6 +43,7 @@ export function walletCommand(binary,directory,operation,{timeout=540000,env=pro
 export async function syncWalletCycle({root,binary,password,command=walletCommand}){
  root=resolve(root);const directory=join(root,'wallet'),identityPath=join(root,'identity.json');
  await mkdir(root,{recursive:true,mode:0o700});
+ await atomic(join(root,'status.json'),{syncReady:false,settlementVerified:false,paidFulfillmentEnabled:false,checkedAt:new Date().toISOString()});
  const established=await exists(identityPath);
  if(established&&(!await exists(directory)||(await readdir(directory)).length===0))throw Error('wallet_state_missing');
  await mkdir(directory,{recursive:true,mode:0o700});

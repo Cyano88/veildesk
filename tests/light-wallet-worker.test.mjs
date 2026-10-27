@@ -27,6 +27,7 @@ test('persistent identity and encrypted offline recovery survive restart and rej
   assert.equal((await syncWalletCycle(options)).syncReady,true);
   const backup=await readFile(join(root,'recovery.initial.json'),'utf8');
   assert.equal(backup.includes('fixture-wallet-secret'),false);
+  await assert.rejects(syncWalletCycle({...options,password:'another-password-with-32-characters'}),/authentication/);
   changed=true;await assert.rejects(syncWalletCycle(options),/identity_changed/);
   changed=false;await rm(join(root,'wallet'),{recursive:true});
   await assert.rejects(syncWalletCycle(options),/state_missing/);

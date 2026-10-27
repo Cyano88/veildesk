@@ -38,3 +38,19 @@ services:
         sync: false
       - key: VEILDESK_RELAY_URL
         sync: false
+  - type: worker
+    name: veildesk-light-wallet
+    runtime: docker
+    region: oregon
+    plan: starter
+    numInstances: 1
+    autoDeployTrigger: off
+    dockerfilePath: ./ops/light-wallet/Dockerfile
+    dockerContext: .
+    disk:
+      name: veildesk-light-wallet-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: VEILDESK_CHECKPOINT_PASSWORD
+        sync: false
