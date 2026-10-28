@@ -6,7 +6,7 @@ test('public walkthrough is allowlisted while relay API remains authenticated; v
  relay.server.listen(0,'127.0.0.1');await once(relay.server,'listening');const base='http://127.0.0.1:'+relay.server.address().port;
  try{
   const page=await fetch(base+'/');assert.equal(page.status,200);assert.match(page.headers.get('content-type'),/text\/html/);assert.match(page.headers.get('content-security-policy'),/frame-ancestors 'none'/);assert.match(await page.text(),/Both endpoints run in your browser/);
-  for(const [path,type] of [['/brand/polydesk.svg','image/svg+xml'],['/brand/zcash.svg','image/svg+xml'],['/brand/okx-ai.png','image/png']]){const asset=await fetch(base+path);assert.equal(asset.status,200);assert.equal(asset.headers.get('content-type'),type);assert.ok((await asset.arrayBuffer()).byteLength>100);}
+  for(const [path,type] of [['/favicon.svg','image/svg+xml'],['/favicon.png','image/png'],['/brand/polydesk.svg','image/svg+xml'],['/brand/zcash.svg','image/svg+xml'],['/brand/okx-ai.png','image/png']]){const asset=await fetch(base+path);assert.equal(asset.status,200);assert.equal(asset.headers.get('content-type'),type);assert.ok((await asset.arrayBuffer()).byteLength>100);}
   const api=await fetch(base+'/v1/providers');assert.equal(api.status,401);
   for(const path of ['/private/client.json','/src/paid-provider.mjs','/%2e%2e/private/client.json','/web/demo.mp4','/__proto__'])assert.notEqual((await fetch(base+path)).status,200,path);
   assert.equal((await fetch(base+'/',{method:'POST'})).status,405);
