@@ -1,24 +1,26 @@
 import {validateInvoice} from './zcash.mjs';
+import {walletNetwork} from './zcash-network.mjs';
 const hash=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);
 
 // capture is a trusted host callback that performs a fresh completed wallet scan and
 // invokes the native exporter under the same exclusive wallet lock. Never accept a
 // buyer-supplied snapshot or substitute CLI note summaries. This trusts the configured
 // light-wallet indexer; it is not independent full-node consensus verification.
-export function verifyLightWalletSnapshot(snapshot,{address,accountId,now}){
+export function verifyLightWalletSnapshot(snapshot,{address,accountId,now,network='test'}){
+ walletNetwork(network);
  const {evidence:e,scan,capturedAt}=snapshot??{};
  const scannedAt=Date.parse(scan?.checkedAt);
  if(!Number.isSafeInteger(capturedAt)||capturedAt>now||now-capturedAt>30000||!Number.isFinite(scannedAt)
-  ||capturedAt<scannedAt||capturedAt-scannedAt>5000||scan?.syncReady!==true||scan.network!=='test'
-  ||e?.schema!=='veildesk.light-wallet-evidence.v1'||e.network!=='test'||!hash(e.walletDigest)
+  ||capturedAt<scannedAt||capturedAt-scannedAt>5000||scan?.syncReady!==true||scan.network!==network
+  ||e?.schema!=='veildesk.light-wallet-evidence.v1'||e.network!==network||!hash(e.walletDigest)
   ||!Number.isSafeInteger(e.tip?.height)||e.tip.height<1||!hash(e.tip.hash)||scan.height!==e.tip.height)
   throw Error('Fresh complete light-wallet evidence required');
  if(e.recipient?.tracked!==true||e.recipient.accountId!==accountId||e.recipient.address!==address)
   throw Error('Light-wallet recipient binding mismatch');
  return e;
 }
-function inspect(snapshot,{invoice,accountId,txid,minimumConfirmations,now}){
- const e=verifyLightWalletSnapshot(snapshot,{address:invoice.address,accountId,now});
+function inspect(snapshot,{invoice,accountId,txid,minimumConfirmations,now,network}){
+ const e=verifyLightWalletSnapshot(snapshot,{address:invoice.address,accountId,now,network});
  const tx=e.transaction;
  if(tx===null)return {state:now>=invoice.expiresAt?'expired_unpaid':'awaiting_payment',executionAuthorized:false};
  if(!tx||tx.txid!==txid||tx.shieldedOnly!==true||!Number.isSafeInteger(tx.actionCount)||tx.actionCount<1
@@ -44,15 +46,15 @@ function inspect(snapshot,{invoice,accountId,txid,minimumConfirmations,now}){
  return {state:now>=invoice.expiresAt?'late_payment_review':'confirmed',noteId:`${txid}:${tx.pool}:${index}`,
   blockhash:tx.blockhash,height:tx.height,confirmations,executionAuthorized:false};
 }
-export async function verifyLightWalletReceipt({capture,invoice,accountId,txid,minimumConfirmations=3,now=Date.now}){
- validateInvoice(invoice);
- if(invoice.network!=='test'||!Number.isSafeInteger(accountId)||accountId<0||accountId>0x7fffffff
+export async function verifyLightWalletReceipt({capture,invoice,accountId,txid,minimumConfirmations=3,now=Date.now,network='test'}){
+ walletNetwork(network);validateInvoice(invoice);
+ if(invoice.network!==network||!Number.isSafeInteger(accountId)||accountId<0||accountId>0x7fffffff
   ||!hash(txid)||typeof capture!=='function'||typeof now!=='function'||!Number.isSafeInteger(minimumConfirmations)||minimumConfirmations<3)
   throw Error('Invalid light-wallet verification policy');
  const query={accountId,address:invoice.address,txid};
- const first=await capture(query),receipt=inspect(first,{invoice,accountId,txid,minimumConfirmations,now:now()});
+ const first=await capture(query),receipt=inspect(first,{invoice,accountId,txid,minimumConfirmations,network,now:now()});
  if(!receipt.noteId)return receipt;
- const second=await capture(query),rechecked=inspect(second,{invoice,accountId,txid,minimumConfirmations,now:now()});
+ const second=await capture(query),rechecked=inspect(second,{invoice,accountId,txid,minimumConfirmations,network,now:now()});
  if(first.evidence.tip.height!==second.evidence.tip.height||first.evidence.tip.hash!==second.evidence.tip.hash
   ||receipt.noteId!==rechecked.noteId||receipt.blockhash!==rechecked.blockhash||receipt.height!==rechecked.height)
   throw Error('Chain or note changed during light-wallet verification; retry');

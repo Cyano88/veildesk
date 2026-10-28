@@ -42,3 +42,12 @@ test('recheck rejects reorgs and missing notes; late and absent payments remain 
  assert.equal((await verifyLightWalletReceipt(options)).state,'late_payment_review');
  snapshot.evidence.transaction=null;assert.equal((await verifyLightWalletReceipt(options)).state,'expired_unpaid');
 });
+
+test('mainnet receipts require explicit network and reject testnet substitution (synthetic evidence)',async()=>{
+ const {snapshot,options}=fixture();options.invoice.network='main';options.network='main';snapshot.scan.network='main';snapshot.evidence.network='main';
+ assert.equal((await verifyLightWalletReceipt(options)).state,'confirmed');
+ await assert.rejects(verifyLightWalletReceipt({...options,network:'test'}),/policy/);
+ snapshot.scan.network='test';await assert.rejects(verifyLightWalletReceipt(options),/Fresh complete/);
+ snapshot.scan.network='main';snapshot.evidence.network='test';await assert.rejects(verifyLightWalletReceipt(options),/Fresh complete/);
+ snapshot.evidence.network='main';options.invoice.network='test';await assert.rejects(verifyLightWalletReceipt(options),/policy/);
+});

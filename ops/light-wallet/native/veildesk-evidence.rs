@@ -24,13 +24,16 @@ fn notes<N: NoteInterface<ZcashNote=orchard::Note, KeyId=KeyId>>(
     }
     Ok(result)
 }
+fn chain_for_network(network: &str) -> Result<ChainType, &'static str> { match network {"test"=>Ok(ChainType::Testnet),"main"=>Ok(ChainType::Mainnet),_=>Err("invalid_network")} }
 fn export() -> Result<JsonValue, &'static str> {
     let args:Vec<String>=std::env::args().collect();
     if args.len()!=2 {return Err("wallet_path_required")}
     let mut input=String::new();io::stdin().take(8193).read_to_string(&mut input).map_err(|_|"query_read_failed")?;
     if input.len()>8192 {return Err("query_too_large")}
     let query=json::parse(&input).map_err(|_|"invalid_query")?;
-    if !query.is_object()||query.len()!=3 {return Err("invalid_query")}
+    if !query.is_object()||!(query.len()==3||query.len()==4&&query.has_key("network")) {return Err("invalid_query")}
+    let network=if query.has_key("network") {query["network"].as_str().ok_or("invalid_network")?}else{"test"};
+    let chain=chain_for_network(network)?;
     let account=query["accountId"].as_u32().ok_or("invalid_account")?;
     let address=query["address"].as_str().ok_or("invalid_address")?;
     let txid=query["txid"].as_str().ok_or("invalid_txid")?;
@@ -39,13 +42,13 @@ fn export() -> Result<JsonValue, &'static str> {
     if file.metadata().map_err(|_|"wallet_metadata_failed")?.len()>64*1024*1024 {return Err("wallet_too_large")}
     let mut bytes=Vec::new();file.take(64*1024*1024+1).read_to_end(&mut bytes).map_err(|_|"wallet_read_failed")?;
     if bytes.len()>64*1024*1024 {return Err("wallet_too_large")}
-    if LightWallet::read_chain(&bytes).map_err(|_|"wallet_chain_unknown")?!=ChainType::Testnet {return Err("wallet_wrong_network")}
-    let wallet=LightWallet::read(Cursor::new(&bytes),ChainType::Testnet).map_err(|_|"wallet_decode_failed")?;
-    let (_,ua)=wallet.unified_addresses().iter().find(|(id,ua)|u32::from(id.account_id)==account&&ua.encode(&ChainType::Testnet)==address).ok_or("recipient_not_tracked")?;
+    if LightWallet::read_chain(&bytes).map_err(|_|"wallet_chain_unknown")?!=chain {return Err("wallet_wrong_network")}
+    let wallet=LightWallet::read(Cursor::new(&bytes),chain).map_err(|_|"wallet_decode_failed")?;
+    let (_,ua)=wallet.unified_addresses().iter().find(|(id,ua)|u32::from(id.account_id)==account&&ua.encode(&chain)==address).ok_or("recipient_not_tracked")?;
     let receiver=ua.orchard().ok_or("recipient_has_no_orchard_receiver")?;
     let tip_height=wallet.sync_state.last_known_chain_height().ok_or("wallet_tip_missing")?;
     let tip=wallet.wallet_blocks.get(&tip_height).ok_or("wallet_tip_block_missing")?;
-    let mut result=object!{schema:"veildesk.light-wallet-evidence.v1",network:"test",
+    let mut result=object!{schema:"veildesk.light-wallet-evidence.v1",network:network,
         walletDigest:hex::encode(Sha256::digest(&bytes)),recipient:object!{accountId:account,address:address,tracked:true},
         tip:object!{height:u32::from(tip_height),hash:tip.block_hash().to_string()},transaction:JsonValue::Null};
     let Some(transaction)=wallet.wallet_transactions.values().find(|tx|tx.txid().to_string()==txid) else {return Ok(result)};
@@ -91,6 +94,7 @@ fn main(){match export(){Ok(value)=>println!("{}",value.dump()),Err(code)=>{epri
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn network_selection_is_explicit() { assert_eq!(chain_for_network("main").unwrap(),ChainType::Mainnet); assert_eq!(chain_for_network("test").unwrap(),ChainType::Testnet); assert!(chain_for_network("mainnet").is_err()); }
     use pepper_sync::wallet::{IronwoodNote, OrchardNote, OutputId};
     use zingolib::mocks::orchard_note::OrchardCryptoNoteBuilder;
     use zcash_primitives::transaction::TxId;
