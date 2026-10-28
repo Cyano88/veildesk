@@ -7,12 +7,18 @@ import {sealPrivateResult} from './client.mjs';
 import {invoice,zats} from './zcash.mjs';
 import {validateMandate} from './mandate.mjs';
 
+import {PAID_RESEARCH,validateResearchPurchase} from './service-rehearsal.mjs';
+import {sealArtifact} from './artifact.mjs';
 export const PAID_CAPABILITY='prediction.mandate.validate.testnet-paid.v1';
 export const paymentHash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
 // Testnet pilot only. The trusted endpoint verifies wallet evidence; the opaque relay cannot.
 // No spend RPC or automatic refund. Public availability remains disabled until live acceptance.
-export function createPaidProvider({database,network,account,address,amount,nodeRpc,walletRpc,recipient,signer,peers,now=Date.now,settlement}){
+export function createPaidProvider({database,network,account,address,amount,nodeRpc,walletRpc,recipient,signer,peers,now=Date.now,research,settlement}){
+ if(research!==undefined&&typeof research!=='function')throw Error('Invalid research implementation');
+ const researchMode=typeof research==='function',capability=researchMode?paidResearchCapability(network):paidMandateCapability(network);
+ const hashField=researchMode?'requestHash':'mandateHash';
+ const validate=researchMode?validateResearchPurchase:validateMandate;
  walletNetwork(network);if(network==='main'&&!settlement)throw Error('Mainnet requires native settlement');
  if(typeof account!=='string'||!/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(account)||typeof address!=='string'||!address||(!settlement&&(typeof nodeRpc!=='function'||typeof walletRpc!=='function')))throw Error('Invalid testnet payment configuration');zats(amount);
  const paymentBackend=settlement??createZalletSettlement({nodeRpc,walletRpc,account,address});
@@ -25,17 +31,17 @@ export function createPaidProvider({database,network,account,address,amount,node
  return {
   close:()=>db.close(),
   async process(job,{rpc}){
-   const peer=peers[job.client];if(!peer||job.capability!==paidMandateCapability(network))throw Error('Unsupported or unenrolled paid job');
+   const peer=peers[job.client];if(!peer||job.capability!==capability)throw Error('Unsupported or unenrolled paid job');
    const owner=paymentHash([job.client,job.id]);let row=db.prepare('SELECT * FROM paid_jobs WHERE owner=?').get(owner);
    const request=await openSigned(job.envelope,{recipient,expectedSigner:peer.signingKey,id:job.id,direction:'request'});
    if(request?.schema!=='veildesk.job.v1'||request.route?.provider!==job.provider||request.route?.capability!==job.capability||request.route?.expiresAt!==job.expiresAt)throw Error('Paid job context mismatch');
-   const mandate=validateMandate(request.payload,row?.issued??now());if(mandate.id!==job.id||mandate.expiresAt!==job.expiresAt)throw Error('Paid mandate context mismatch');
+   const mandate=validate(researchMode?{id:job.id,expiresAt:job.expiresAt,request:request.payload}:request.payload,row?.issued??now());if(mandate.id!==job.id||mandate.expiresAt!==job.expiresAt)throw Error('Paid mandate context mismatch');
    const binding=paymentHash({owner,request,signer:peer.signingKey,recipient:peer.encryptionKey,providerSigner:signer.publicKey,providerRecipient:recipient.publicKey,account,address,amount,network,...(paymentBackend.id==='zallet-testnet-v1'?{}:{settlement:paymentBackend.id})});
    async function publishReview(reason){
     review(owner,reason);
     let stored=db.prepare('SELECT review_result FROM paid_jobs WHERE owner=?').get(owner)?.review_result;
     if(!stored){
-     const envelope=await sealPrivateResult(job,{status:'payment_review',reason,mandateHash:paymentHash(mandate),paymentVerified:false,tradeSubmitted:false},{signer,recipientPublicKey:peer.encryptionKey});
+     const envelope=await sealPrivateResult(job,{status:'payment_review',reason,[hashField]:paymentHash(mandate),paymentVerified:false,tradeSubmitted:false},{signer,recipientPublicKey:peer.encryptionKey});
      db.prepare('UPDATE paid_jobs SET review_result=? WHERE owner=? AND review_result IS NULL').run(JSON.stringify(envelope),owner);
      stored=db.prepare('SELECT review_result FROM paid_jobs WHERE owner=?').get(owner).review_result;
     }
@@ -47,9 +53,9 @@ export function createPaidProvider({database,network,account,address,amount,node
     // Never solicit payment from a wallet which cannot currently verify receipts.
     await paymentBackend.preflight();
     await paymentBackend.recipient();
-    const issued=now();validateMandate(mandate,issued);
+    const issued=now();validate(mandate,issued);
     const i=invoice({address,amount,network,now:issued});i.expiresAt=Math.min(i.expiresAt,mandate.expiresAt);
-    const challenge=await sealPrivateResult(job,{status:'payment_required',network,invoice:i,invoiceHash:paymentHash(i),mandateHash:paymentHash(mandate),tradeSubmitted:false},{signer,recipientPublicKey:peer.encryptionKey});
+    const challenge=await sealPrivateResult(job,{status:'payment_required',network,invoice:i,invoiceHash:paymentHash(i),[hashField]:paymentHash(mandate),tradeSubmitted:false},{signer,recipientPublicKey:peer.encryptionKey});
     db.prepare('INSERT OR IGNORE INTO paid_jobs(owner,binding,issued,invoice,challenge) VALUES(?,?,?,?,?)').run(owner,binding,issued,JSON.stringify(i),JSON.stringify(challenge));
     row=db.prepare('SELECT * FROM paid_jobs WHERE owner=?').get(owner);if(row.binding!==binding)throw Error('Paid job binding conflict');
    }
@@ -60,7 +66,7 @@ export function createPaidProvider({database,network,account,address,amount,node
    await rpc('/v1/provider/invoice',{method:'POST',body:{client:job.client,id:job.id,envelope:JSON.parse(row.challenge)}});
    if(!job.paymentHint)return {state:'awaiting_payment',executionAuthorized:false};
    const i=JSON.parse(row.invoice),hint=await openSigned(job.paymentHint,{recipient,expectedSigner:peer.signingKey,id:job.id,direction:'request'});
-   if(hint?.schema!=='veildesk.payment-hint.v1'||hint.provider!==job.provider||hint.capability!==job.capability||hint.invoiceHash!==paymentHash(i)||hint.mandateHash!==paymentHash(mandate)||typeof hint.txid!=='string'||!/^[a-f0-9]{64}$/.test(hint.txid))throw Error('Payment hint authentication or binding failed');
+   if(hint?.schema!=='veildesk.payment-hint.v1'||hint.provider!==job.provider||hint.capability!==job.capability||hint.invoiceHash!==paymentHash(i)||hint[hashField]!==paymentHash(mandate)||typeof hint.txid!=='string'||!/^[a-f0-9]{64}$/.test(hint.txid))throw Error('Payment hint authentication or binding failed');
    const receipt=await paymentBackend.verify({invoice:i,txid:hint.txid,now:now()});
    if(receipt.state==='awaiting_payment')return {state:'awaiting_payment',executionAuthorized:false};
    if(receipt.state!=='confirmed')return publishReview(receipt.state);
@@ -77,14 +83,27 @@ export function createPaidProvider({database,network,account,address,amount,node
      db.exec('COMMIT');
     }catch(error){try{db.exec('ROLLBACK')}catch{}throw error}
     if(!reserved)throw Error('Concurrent or uncertain paid result; reconcile before retry');
-    const result=await sealPrivateResult(job,{status:'validated',mandate,marketVerified:false,paymentVerified:true,tradeSubmitted:false,payment:{network,txid:hint.txid,noteId:receipt.noteId,blockhash:receipt.blockhash,confirmations:receipt.confirmations,invoiceHash:paymentHash(i),mandateHash:paymentHash(mandate)}},{signer,recipientPublicKey:peer.encryptionKey});
+    const payment={network,txid:hint.txid,noteId:receipt.noteId,blockhash:receipt.blockhash,confirmations:receipt.confirmations,invoiceHash:paymentHash(i),[hashField]:paymentHash(mandate)};
+    let result;
+    if(researchMode){
+     // Reserve the verified note before any upstream work. Exceptions leave reconciliation state.
+     const report=await research(structuredClone(mandate.request.input));
+     if(report?.schema!=='polydesk-a2a-market-research-v1'||report.orderAuthorized!==false||report.orderSubmitted!==false)throw Error('Invalid research result');
+     const {manifest,chunks}=await sealArtifact(job,report,{signer,recipientPublicKey:peer.encryptionKey});
+     const envelope=await sealPrivateResult(job,{schema:'veildesk.service-result.v1',status:'fulfilled',service:mandate.request.service,
+      mode:network==='main'?'mainnet-paid':'testnet-paid',paymentVerified:true,tradeSubmitted:false,executionAuthorized:false,artifact:manifest,payment},
+      {signer,recipientPublicKey:peer.encryptionKey});
+     result={envelope,chunks};
+    }else result=await sealPrivateResult(job,{status:'validated',mandate,marketVerified:false,paymentVerified:true,tradeSubmitted:false,payment},{signer,recipientPublicKey:peer.encryptionKey});
     db.prepare("UPDATE paid_jobs SET result=?,state='ready' WHERE owner=? AND state='preparing'").run(JSON.stringify(result),owner);
     row=db.prepare('SELECT * FROM paid_jobs WHERE owner=?').get(owner);
    }
-   // Even a saved result must pass a fresh chain check immediately before delivery.
+   const saved=JSON.parse(row.result);
+   if(researchMode)for(let index=0;index<saved.chunks.length;index++)await rpc('/v1/provider/artifact',{method:'POST',body:{client:job.client,id:job.id,index,envelope:saved.chunks[index]}});
+   // Even a saved result must pass a fresh chain check after uploads, immediately before delivery.
    const final=await paymentBackend.verify({invoice:i,txid:hint.txid,now:now()});
    if(final.state!=='confirmed'||final.noteId!==row.note||final.blockhash!==row.blockhash||now()>=Math.min(i.expiresAt,mandate.expiresAt))return publishReview('finality_or_expiry_review');
-   return rpc('/v1/provider/deliver',{method:'POST',body:{client:job.client,id:job.id,envelope:JSON.parse(row.result)}});
+   return rpc('/v1/provider/deliver',{method:'POST',body:{client:job.client,id:job.id,envelope:researchMode?saved.envelope:saved,...(researchMode?{artifactCount:saved.chunks.length}:{})}});
   }
  };
 }

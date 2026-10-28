@@ -3,6 +3,8 @@ import {createHash,timingSafeEqual} from 'node:crypto';
 import {createServer} from 'node:http';
 const digest=x=>createHash('sha256').update(x).digest('hex');
 const uuid=x=>typeof x==='string'&&/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(x);
+const paidCapability=x=>['prediction.mandate.validate.testnet-paid.v1','polydesk.research.testnet-paid.v1','prediction.mandate.validate.mainnet-paid.v1','polydesk.research.mainnet-paid.v1'].includes(x);
+const artifactCapability=x=>['polydesk.research.rehearsal.v1','polydesk.research.testnet-paid.v1','polydesk.research.mainnet-paid.v1'].includes(x);
 function fail(status,message){throw Object.assign(Error(message),{status})}
 export function validateRelayEnvelope(e,id,direction){
  const fields=['version','id','direction','ephemeralPublicKey','salt','iv','ciphertext'];
@@ -14,9 +16,9 @@ export function validateRelayEnvelope(e,id,direction){
 }
 // Opaque relay: application payloads are authenticated/decrypted only at endpoints.
 // Configure one SQLite file on a persistent local volume, not a network filesystem.
-export function createRelay({database,principals,providers,now=Date.now,maxPending=1000,maxRecords=100000,maxRequestsPerMinute=600,bodyTimeoutMs=10000}){
+export function createRelay({database,principals,providers,now=Date.now,maxPending=1000,maxRecords=100000,maxRequestsPerMinute=600,bodyTimeoutMs=10000,maxArtifactChunks=8192}){
  if(!Array.isArray(principals)||!principals.length||!Array.isArray(providers))throw Error('Missing relay configuration');
- for(const n of [maxPending,maxRecords,maxRequestsPerMinute])if(!Number.isSafeInteger(n)||n<1)throw Error('Invalid resource limit');
+ for(const n of [maxPending,maxRecords,maxRequestsPerMinute,maxArtifactChunks])if(!Number.isSafeInteger(n)||n<1)throw Error('Invalid resource limit');
  if(!Number.isSafeInteger(bodyTimeoutMs)||bodyTimeoutMs<100||bodyTimeoutMs>15000)throw Error('Invalid body timeout');
  const ids=new Set(),tokens=new Set();
  for(const p of principals){
@@ -26,7 +28,12 @@ export function createRelay({database,principals,providers,now=Date.now,maxPendi
  for(const p of providers)if(!principals.some(x=>x.role==='provider'&&x.id===p.id)||!Array.isArray(p.capabilities)||typeof p.encryptionKey!=='string'||typeof p.signingKey!=='string')throw Error('Invalid provider configuration');
  if(new Set(providers.map(p=>p.id)).size!==providers.length)throw Error('Duplicate provider');
  for(const p of providers)if(p.allowedClients!==undefined&&(!Array.isArray(p.allowedClients)||!p.allowedClients.length||new Set(p.allowedClients).size!==p.allowedClients.length||p.allowedClients.some(id=>!principals.some(x=>x.id===id&&x.role==='client'))))throw Error('Invalid private provider enrollment');
- providers=providers.map(p=>({id:p.id,encryptionKey:p.encryptionKey,signingKey:p.signingKey,capabilities:[...p.capabilities],...(p.allowedClients?{allowedClients:[...p.allowedClients]}:{})}));
+ for(const p of providers)if(p.capabilityClients!==undefined){
+  if(!p.capabilityClients||typeof p.capabilityClients!=='object'||Array.isArray(p.capabilityClients))throw Error('Invalid capability enrollment');
+  for(const [capability,clients] of Object.entries(p.capabilityClients))if(!p.capabilities.includes(capability)||!Array.isArray(clients)||!clients.length||new Set(clients).size!==clients.length||clients.some(id=>!principals.some(x=>x.id===id&&x.role==='client')))throw Error('Invalid capability enrollment');
+ }
+ providers=providers.map(p=>({id:p.id,encryptionKey:p.encryptionKey,signingKey:p.signingKey,capabilities:[...p.capabilities],...(p.allowedClients?{allowedClients:[...p.allowedClients]}:{}),capabilityClients:structuredClone(p.capabilityClients??{})}));
+ const canUse=(p,capability,id)=>!Object.hasOwn(p.capabilityClients,capability)||p.capabilityClients[capability].includes(id);
  const usage=new Map();
  const db=new DatabaseSync(database);db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;
  CREATE TABLE IF NOT EXISTS relay_jobs(client TEXT NOT NULL,id TEXT NOT NULL,provider TEXT NOT NULL,capability TEXT NOT NULL,request TEXT NOT NULL,request_hash TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('queued','processing','completed','expired')),created INTEGER NOT NULL,expires INTEGER NOT NULL,response TEXT,PRIMARY KEY(client,id));
@@ -34,6 +41,8 @@ export function createRelay({database,principals,providers,now=Date.now,maxPendi
  // Additive migration: existing unpaid jobs and immutable results are preserved.
  const columns=new Set(db.prepare('PRAGMA table_info(relay_jobs)').all().map(c=>c.name));
  for(const column of ['invoice','payment_hint','payment_review'])if(!columns.has(column))db.exec(`ALTER TABLE relay_jobs ADD COLUMN ${column} TEXT`);
+ if(!columns.has('artifact_count'))db.exec('ALTER TABLE relay_jobs ADD COLUMN artifact_count INTEGER NOT NULL DEFAULT 0');
+ db.exec('CREATE TABLE IF NOT EXISTS relay_artifacts(client TEXT NOT NULL,id TEXT NOT NULL,idx INTEGER NOT NULL,envelope TEXT NOT NULL,PRIMARY KEY(client,id,idx))');
  function auth(req){
   const header=req.headers.authorization;if(typeof header!=='string'||!/^Bearer [A-Za-z0-9_-]{32,256}$/.test(header))fail(401,'Unauthorized');
   const hash=Buffer.from(digest(header.slice(7)),'hex');const p=principals.find(x=>timingSafeEqual(hash,Buffer.from(x.tokenHash,'hex')));if(!p)fail(401,'Unauthorized');return p;
@@ -62,10 +71,10 @@ export function createRelay({database,principals,providers,now=Date.now,maxPendi
     const minute=Math.floor(now()/60000),window=usage.get(principal.id);
     if(!window||window.minute!==minute)usage.set(principal.id,{minute,count:1});
     else if(++window.count>maxRequestsPerMinute){res.setHeader('Retry-After','60');fail(429,'Request rate exceeded')}
-    if(req.url==='/v1/providers'&&req.method==='GET')result={schema:'veildesk.providers.v1',providers:providers.filter(p=>!p.allowedClients||p.allowedClients.includes(principal.id)||p.id===principal.id).map(({allowedClients,...descriptor})=>descriptor)};
+    if(req.url==='/v1/providers'&&req.method==='GET')result={schema:'veildesk.providers.v1',providers:providers.filter(p=>!p.allowedClients||p.allowedClients.includes(principal.id)||p.id===principal.id).map(({allowedClients,capabilityClients,...descriptor})=>({...descriptor,capabilities:descriptor.capabilities.filter(c=>descriptor.id===principal.id||canUse({capabilityClients},c,principal.id))})).filter(p=>p.capabilities.length)};
     else if(req.url==='/v1/jobs'&&req.method==='POST'){
      if(principal.role!=='client')fail(403,'Forbidden');const b=await body(req);exact(b,['id','provider','capability','expiresAt','envelope']);validateRelayEnvelope(b.envelope,b.id,'request');
-     const provider=providers.find(x=>x.id===b.provider);if(!provider||!provider.capabilities.includes(b.capability))fail(400,'Unsupported provider capability');if(provider.allowedClients&&!provider.allowedClients.includes(principal.id))fail(403,'Provider is privately enrolled');
+     const provider=providers.find(x=>x.id===b.provider);if(!provider||!provider.capabilities.includes(b.capability))fail(400,'Unsupported provider capability');if(provider.allowedClients&&!provider.allowedClients.includes(principal.id))fail(403,'Provider is privately enrolled');if(!canUse(provider,b.capability,principal.id))fail(403,'Capability is privately enrolled');
      const e=b.envelope;
      const request=JSON.stringify({id:b.id,provider:b.provider,capability:b.capability,expiresAt:b.expiresAt,envelope:{version:e.version,id:e.id,direction:e.direction,ephemeralPublicKey:e.ephemeralPublicKey,salt:e.salt,iv:e.iv,ciphertext:e.ciphertext}}),hash=digest(request);const prior=db.prepare('SELECT * FROM relay_jobs WHERE client=? AND id=?').get(principal.id,b.id);
      if(prior){if(prior.request_hash!==hash)fail(409,'Job ID conflict');result=describe(prior)}
@@ -92,31 +101,57 @@ export function createRelay({database,principals,providers,now=Date.now,maxPendi
     }else if(req.url==='/v1/provider/payment-review'&&req.method==='POST'){
      if(principal.role!=='provider')fail(403,'Forbidden');const b=await body(req);exact(b,['client','id','envelope']);validateRelayEnvelope(b.envelope,b.id,'response');
      const row=db.prepare('SELECT * FROM relay_jobs WHERE client=? AND id=? AND provider=?').get(b.client,b.id,principal.id);if(!row)fail(404,'Job not found');
-     if(!['prediction.mandate.validate.testnet-paid.v1','prediction.mandate.validate.mainnet-paid.v1'].includes(row.capability)||row.state!=='processing')fail(409,'Job cannot enter payment review');
+     if(!paidCapability(row.capability)||row.state!=='processing')fail(409,'Job cannot enter payment review');
      const value=JSON.stringify(b.envelope);if(row.payment_review&&row.payment_review!==value)fail(409,'Payment review conflict');
      if(!row.payment_review)db.prepare('UPDATE relay_jobs SET payment_review=? WHERE client=? AND id=?').run(value,b.client,b.id);
      result={id:b.id,state:'payment_review',executionAuthorized:false};
     }else if(req.url==='/v1/provider/invoice'&&req.method==='POST'){
      if(principal.role!=='provider')fail(403,'Forbidden');const b=await body(req);exact(b,['client','id','envelope']);validateRelayEnvelope(b.envelope,b.id,'response');
      const row=db.prepare('SELECT * FROM relay_jobs WHERE client=? AND id=? AND provider=?').get(b.client,b.id,principal.id);if(!row)fail(404,'Job not found');
-     if(!['prediction.mandate.validate.testnet-paid.v1','prediction.mandate.validate.mainnet-paid.v1'].includes(row.capability)||!['processing','completed'].includes(row.state))fail(409,'Job is not awaiting a payment invoice');
+     if(!paidCapability(row.capability)||!['processing','completed'].includes(row.state))fail(409,'Job is not awaiting a payment invoice');
      const value=JSON.stringify(b.envelope);if(row.invoice&&row.invoice!==value)fail(409,'Invoice conflict');
      if(!row.invoice){if(row.state!=='processing'||now()>=row.expires)fail(409,'Job expired or completed');db.prepare('UPDATE relay_jobs SET invoice=? WHERE client=? AND id=?').run(value,b.client,b.id)}
      result={id:b.id,state:'invoice_issued',executionAuthorized:false};
     }else if(req.method==='POST'&&/^\/v1\/jobs\/[a-f0-9-]+\/payment$/.test(req.url)){
      if(principal.role!=='client')fail(403,'Forbidden');const id=req.url.split('/')[3],b=await body(req);exact(b,['envelope']);validateRelayEnvelope(b.envelope,id,'request');
      const row=db.prepare('SELECT * FROM relay_jobs WHERE client=? AND id=?').get(principal.id,id);if(!row)fail(404,'Job not found');
-     if(!row.invoice||row.state!=='processing'||!['prediction.mandate.validate.testnet-paid.v1','prediction.mandate.validate.mainnet-paid.v1'].includes(row.capability))fail(409,'No pending payment invoice');
+     if(!row.invoice||row.state!=='processing'||!paidCapability(row.capability))fail(409,'No pending payment invoice');
      const value=JSON.stringify(b.envelope);if(row.payment_hint&&row.payment_hint!==value)fail(409,'Payment hint conflict');
      if(!row.payment_hint)db.prepare('UPDATE relay_jobs SET payment_hint=? WHERE client=? AND id=?').run(value,principal.id,id);
      result={id,state:'evidence_submitted',executionAuthorized:false};
+    }else if(req.url==='/v1/provider/artifact'&&req.method==='POST'){
+     if(principal.role!=='provider')fail(403,'Forbidden');const b=await body(req);exact(b,['client','id','index','envelope']);validateRelayEnvelope(b.envelope,b.id,'response');
+     if(!Number.isSafeInteger(b.index)||b.index<0||b.index>=64)fail(400,'Invalid artifact index');
+     const row=db.prepare('SELECT * FROM relay_jobs WHERE client=? AND id=? AND provider=?').get(b.client,b.id,principal.id);if(!row)fail(404,'Job not found');
+     if(!artifactCapability(row.capability)||row.payment_review||!['processing','completed'].includes(row.state)
+       ||(paidCapability(row.capability)&&(!row.invoice||!row.payment_hint)))fail(409,'Artifact upload unavailable');
+     const value=JSON.stringify(b.envelope),prior=db.prepare('SELECT envelope FROM relay_artifacts WHERE client=? AND id=? AND idx=?').get(b.client,b.id,b.index);
+     if(prior){if(prior.envelope!==value)fail(409,'Artifact conflict')}
+     else{
+      if(row.state!=='processing')fail(409,'Result already completed');
+      if(db.prepare('SELECT COUNT(*) AS n FROM relay_artifacts').get().n>=maxArtifactChunks)fail(503,'Artifact storage capacity reached');
+      db.prepare('INSERT INTO relay_artifacts(client,id,idx,envelope) VALUES(?,?,?,?)').run(b.client,b.id,b.index,value);
+     }
+     result={id:b.id,index:b.index,state:'stored'};
+    }else if(req.method==='GET'&&/^\/v1\/jobs\/[a-f0-9-]+\/artifacts\/[0-9]+$/.test(req.url)){
+     if(principal.role!=='client')fail(403,'Forbidden');const [, , ,id,,indexText]=req.url.split('/'),index=Number(indexText);
+     if(!uuid(id)||!Number.isSafeInteger(index)||index<0||index>=64||String(index)!==indexText)fail(400,'Invalid artifact index');
+     const row=db.prepare('SELECT * FROM relay_jobs WHERE client=? AND id=?').get(principal.id,id);
+     if(!row||row.state!=='completed'||index>=row.artifact_count)fail(404,'Artifact not found');
+     const chunk=db.prepare('SELECT envelope FROM relay_artifacts WHERE client=? AND id=? AND idx=?').get(principal.id,id,index);
+     if(!chunk)fail(404,'Artifact not found');result={envelope:JSON.parse(chunk.envelope)};
     }else if(req.url==='/v1/provider/deliver'&&req.method==='POST'){
-     if(principal.role!=='provider')fail(403,'Forbidden');const b=await body(req);exact(b,['client','id','envelope']);validateRelayEnvelope(b.envelope,b.id,'response');
+     if(principal.role!=='provider')fail(403,'Forbidden');const b=await body(req);exact(b,Object.hasOwn(b??{},'artifactCount')?['client','id','envelope','artifactCount']:['client','id','envelope']);validateRelayEnvelope(b.envelope,b.id,'response');
      const row=db.prepare('SELECT * FROM relay_jobs WHERE client=? AND id=? AND provider=?').get(b.client,b.id,principal.id);if(!row)fail(404,'Job not found');
      if(row.payment_review)fail(409,'Payment requires review');
+     const count=b.artifactCount??0;
+     if(!Number.isSafeInteger(count)||count<0||count>64||(count>0&&!artifactCapability(row.capability)))fail(400,'Invalid artifact count');
+     if(['polydesk.research.testnet-paid.v1','polydesk.research.mainnet-paid.v1'].includes(row.capability)&&(!count||!row.invoice||!row.payment_hint))fail(409,'Paid research incomplete');
+     const stored=db.prepare('SELECT COUNT(*) AS n,MAX(idx) AS last FROM relay_artifacts WHERE client=? AND id=?').get(b.client,b.id);
+     if(stored.n!==count||(count>0&&stored.last!==count-1))fail(409,'Artifact incomplete');
      const response=JSON.stringify(b.envelope);
-     if(row.state==='completed'){if(row.response!==response)fail(409,'Delivery conflict')}
-     else{if(row.state!=='processing')fail(409,'Job not claimed');db.prepare("UPDATE relay_jobs SET state='completed',response=? WHERE client=? AND id=?").run(response,b.client,b.id)}
+     if(row.state==='completed'){if(row.response!==response||row.artifact_count!==count)fail(409,'Delivery conflict')}
+     else{if(row.state!=='processing')fail(409,'Job not claimed');db.prepare("UPDATE relay_jobs SET state='completed',response=?,artifact_count=? WHERE client=? AND id=?").run(response,count,b.client,b.id)}
      result={id:b.id,state:'completed',late:now()>=row.expires,executionAuthorized:false};
     }else if(req.method==='GET'&&/^\/v1\/jobs\/[a-f0-9-]+$/.test(req.url)){
      if(principal.role!=='client')fail(403,'Forbidden');const id=req.url.slice('/v1/jobs/'.length);if(!uuid(id))fail(400,'Invalid ID');

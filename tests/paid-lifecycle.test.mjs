@@ -133,7 +133,6 @@ test('restored client outbox retains mandate and payment-hint binding',async()=>
   await f.process(job);assert.deepEqual((await restored.get(job.id)).result,(await f.client.get(job.id)).result);
  }finally{await f.close()}
 });
-
 test('native settlement backend gates authenticated payment and preserves restart replay without Zallet RPC',async()=>{
  const {createLightWalletSettlement}=await import('../src/settlement.mjs');
  const {nativePaymentFixture}=await import('./fixtures/native-payment.mjs');
@@ -154,6 +153,7 @@ test('native settlement backend gates authenticated payment and preserves restar
   await assert.rejects(f.process(job),/binding conflict/);
  }finally{await f.close()}
 });
+
 
 
 test('mainnet authenticated payment lifecycle preserves network and invoice cap (synthetic evidence)',async()=>{

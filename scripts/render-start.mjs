@@ -15,4 +15,4 @@ const runtime=await mkdtemp(join(tmpdir(),'veildesk-runtime-')),file=join(runtim
 if(role==='relay'){
  process.env.VEILDESK_RELAY_CONFIG=file;process.env.VEILDESK_BIND='0.0.0.0';process.env.VEILDESK_BEHIND_TLS_PROXY='true';
  await import('./relay-server.mjs');
-}else{process.env.VEILDESK_PROVIDER_CONFIG=file;await import('./provider-worker.mjs')}
+}else{process.env.VEILDESK_PROVIDER_CONFIG=file;const {runProviderWorker}=await import('./provider-worker.mjs');await runProviderWorker()}
