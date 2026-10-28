@@ -25,3 +25,11 @@ These are observations at this checkpoint, not permanent faucet availability cla
 ## Resume
 
 Reconcile the existing claim before any retry. Once a compatible faucet funds the buyer, sync and verify the received note and spendable balance. Then obtain a signed invoice for an authenticated buyer service request, pay its exact address/amount/memo with a bounded testnet-only send path, and verify the real recipient note through the deployed private bridge. Complete encrypted PolyDesk report delivery and restart/replay acceptance before enabling paid service capability. Trade execution remains separately authorized.
+
+## Funding compatibility follow-up and video (2026-10-28)
+
+The wallet parser confirmed that the buyer's original address is already a testnet Orchard-only UA. A separate transparent-address inventory found an existing unused testnet receiving address. The wallet refused to create another one under its no-gap rule; no bypass or address reset was used.
+
+After rechecking that the original claim had failed, one claim was submitted to the existing transparent address. It also failed with `the wallet cannot pay this address`, with zero successful broadcasts. Thus a simple Orchard-only address replacement does not resolve the problem. The precise faucet-side cause remains unknown. Jino still reported `node status unknown`. No funds were received or sent by the buyer as evidence of a completed purchase.
+
+A fresh live Render bridge check passed at 2026-10-28 02:16:39 UTC: authenticated bridge, tracked recipient, unknown transaction awaiting_payment, settlementVerified=false and tradeSubmitted=false. The run was video-recorded alongside independent local coordination and the actual PolyDesk engine's synthetic-receipt integration test. Video and source/output integrity manifests are in the operator's ignored `output/playwright/` directory; see `docs/demo-recording-2026-10-28.md` for scope.
