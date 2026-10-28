@@ -71,6 +71,10 @@ PolyDesk owns research, retrieval and inference configuration. VeilDesk owns the
 
 Start with the [integrator quickstart](docs/integrator-quickstart.md), [relay API](docs/relay-api.md), and [MCP preview adapter](docs/agent-mcp.md). The paid SDK entry point is `createPaidResearchClient` in `src/mandate-client.mjs`; the bounded operator payment tools are in `ops/mainnet-service/`. The public browser demo does not grant access to the private paid capability.
 
+## Signing policy candidate (not deployed)
+
+A separate [authorization-gate candidate](docs/signing-authorization-gate.md) checks a signed agent approval and the actual Solana transaction message before invoking a mock sponsor signer. It demonstrates sponsor/customer separation, exact transfer limits and durable one-time authorization. It is not connected to live wallets and does not extend research or preview approvals into trading authority.
+
 ## Privacy and trust boundaries
 
 - Requests and responses use authenticated envelopes with P-256 ECDH/ECDSA, HKDF-SHA256 and AES-256-GCM. Payloads are padded to 4,096 bytes and bound to request ID, direction and recipient.
