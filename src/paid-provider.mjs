@@ -14,7 +14,8 @@ export const paymentHash=value=>createHash('sha256').update(JSON.stringify(value
 
 // Testnet pilot only. The trusted endpoint verifies wallet evidence; the opaque relay cannot.
 // No spend RPC or automatic refund. Public availability remains disabled until live acceptance.
-export function createPaidProvider({database,network,account,address,amount,nodeRpc,walletRpc,recipient,signer,peers,now=Date.now,research,settlement}){
+export function createPaidProvider({database,network,account,address,amount,nodeRpc,walletRpc,recipient,signer,peers,now=Date.now,research,settlement,invoiceLifetimeMs=900000}){
+ if(!Number.isSafeInteger(invoiceLifetimeMs)||invoiceLifetimeMs<60000||invoiceLifetimeMs>3600000)throw Error('Invalid invoice lifetime');
  if(research!==undefined&&typeof research!=='function')throw Error('Invalid research implementation');
  const researchMode=typeof research==='function',capability=researchMode?paidResearchCapability(network):paidMandateCapability(network);
  const hashField=researchMode?'requestHash':'mandateHash';
@@ -49,12 +50,14 @@ export function createPaidProvider({database,network,account,address,amount,node
     return {state:'payment_review',reason,executionAuthorized:false};
    }
    if(row&&row.binding!==binding)throw Error('Paid job binding conflict');
+   let recipientChecked=false;
    if(!row){
     // Never solicit payment from a wallet which cannot currently verify receipts.
-    await paymentBackend.preflight();
-    await paymentBackend.recipient();
+    const readiness=await paymentBackend.preflight();
+    if(readiness?.recipientTracked!==true)await paymentBackend.recipient();
+    recipientChecked=true;
     const issued=now();validate(mandate,issued);
-    const i=invoice({address,amount,network,now:issued});i.expiresAt=Math.min(i.expiresAt,mandate.expiresAt);
+    const i=invoice({address,amount,network,now:issued});i.expiresAt=Math.min(issued+invoiceLifetimeMs,mandate.expiresAt);
     const challenge=await sealPrivateResult(job,{status:'payment_required',network,invoice:i,invoiceHash:paymentHash(i),[hashField]:paymentHash(mandate),tradeSubmitted:false},{signer,recipientPublicKey:peer.encryptionKey});
     db.prepare('INSERT OR IGNORE INTO paid_jobs(owner,binding,issued,invoice,challenge) VALUES(?,?,?,?,?)').run(owner,binding,issued,JSON.stringify(i),JSON.stringify(challenge));
     row=db.prepare('SELECT * FROM paid_jobs WHERE owner=?').get(owner);if(row.binding!==binding)throw Error('Paid job binding conflict');
@@ -62,7 +65,7 @@ export function createPaidProvider({database,network,account,address,amount,node
    if(row.state==='review')return publishReview(row.review);
    if(row.state==='preparing')throw Error('Paid result pending reconciliation; do not execute again');
    if(now()>=mandate.expiresAt)return publishReview('mandate_expired_review');
-   await paymentBackend.recipient();
+   if(!recipientChecked)await paymentBackend.recipient();
    await rpc('/v1/provider/invoice',{method:'POST',body:{client:job.client,id:job.id,envelope:JSON.parse(row.challenge)}});
    if(!job.paymentHint)return {state:'awaiting_payment',executionAuthorized:false};
    const i=JSON.parse(row.invoice),hint=await openSigned(job.paymentHint,{recipient,expectedSigner:peer.signingKey,id:job.id,direction:'request'});

@@ -55,7 +55,12 @@ export async function verifyLightWalletReceipt({capture,invoice,accountId,txid,m
  const first=await capture(query),receipt=inspect(first,{invoice,accountId,txid,minimumConfirmations,network,now:now()});
  if(!receipt.noteId)return receipt;
  const second=await capture(query),rechecked=inspect(second,{invoice,accountId,txid,minimumConfirmations,network,now:now()});
- if(first.evidence.tip.height!==second.evidence.tip.height||first.evidence.tip.hash!==second.evidence.tip.hash
+ // A later tip is safe only when its verified chain retains every previously
+ // observed block. Requiring an identical tip starves verification on slow links.
+ const previous=first.evidence.transaction.chain,current=second.evidence.transaction?.chain;
+ const extension=Array.isArray(current)&&current.length>=previous.length
+  &&previous.every((block,index)=>block.height===current[index].height&&block.hash===current[index].hash&&block.previousHash===current[index].previousHash);
+ if(!extension
   ||receipt.noteId!==rechecked.noteId||receipt.blockhash!==rechecked.blockhash||receipt.height!==rechecked.height)
   throw Error('Chain or note changed during light-wallet verification; retry');
  return rechecked;

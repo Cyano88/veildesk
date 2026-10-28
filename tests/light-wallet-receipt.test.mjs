@@ -51,3 +51,17 @@ test('mainnet receipts require explicit network and reject testnet substitution 
  snapshot.scan.network='main';snapshot.evidence.network='test';await assert.rejects(verifyLightWalletReceipt(options),/Fresh complete/);
  snapshot.evidence.network='main';options.invoice.network='test';await assert.rejects(verifyLightWalletReceipt(options),/policy/);
 });
+
+test('confirmation recheck accepts a chain extension but rejects a changed retained block',async()=>{
+ for(const reorg of [false,true]){
+  const {snapshot,options}=fixture();let calls=0;
+  options.capture=async()=>{const copy=structuredClone(snapshot);if(++calls===2){
+   const tx=copy.evidence.transaction;
+   if(reorg){tx.chain[2].hash=hash(900);}
+   tx.chain.push({height:101,hash:hash(101),previousHash:tx.chain[2].hash});
+   copy.scan.height=101;copy.evidence.tip={height:101,hash:hash(101)};
+  }return copy;};
+  if(reorg)await assert.rejects(verifyLightWalletReceipt(options),/Chain or note changed/);
+  else {const result=await verifyLightWalletReceipt(options);assert.equal(result.state,'confirmed');assert.equal(result.confirmations,4);}
+ }
+});

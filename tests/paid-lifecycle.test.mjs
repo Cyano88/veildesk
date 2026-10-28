@@ -4,7 +4,7 @@ import test from 'node:test';import assert from 'node:assert/strict';import {mkd
 import {createRelay} from '../src/relay.mjs';import {createMandateClient} from '../src/mandate-client.mjs';import {relayClient} from '../src/client.mjs';import {loadEndpointIdentity} from '../src/endpoint-identity.mjs';import {createPaidProvider,PAID_CAPABILITY} from '../src/paid-provider.mjs';import {sealSigned} from '../src/authenticated.mjs';
 async function identity(){async function pair(name,usage){const k=await crypto.subtle.generateKey({name,namedCurve:'P-256'},true,usage);return {privateKey:await crypto.subtle.exportKey('jwk',k.privateKey),publicKey:Buffer.from(await crypto.subtle.exportKey('raw',k.publicKey)).toString('base64')}}return {encryption:await pair('ECDH',['deriveBits']),signing:await pair('ECDSA',['sign','verify'])}}
 const txid='a'.repeat(64),blockhash='b'.repeat(64),account='00000000-0000-4000-8000-000000000002';
-async function setup({network='test',settlement}={}){
+async function setup({network='test',settlement,invoiceLifetimeMs}={}){
  const capability=paidMandateCapability(network);
  const directory=await mkdtemp(join(tmpdir(),'veildesk-paid-')),clientIdentity=await identity(),providerIdentity=await identity();let now=Date.now();
  const provider={id:'provider',encryptionKey:providerIdentity.encryption.publicKey,signingKey:providerIdentity.signing.publicKey,capabilities:[capability]};
@@ -16,6 +16,7 @@ async function setup({network='test',settlement}={}){
  const recipientRecord={account_uuid:account,addresses:[{ua:'testnet-fixture-recipient'}]};
  const nodeRpc=async method=>({getblockchaininfo:chain,getrawtransaction:raw,getblockhash:raw.blockhash})[method],walletRpc=async method=>({getwalletstatus:status,z_viewtransaction:view,z_getaccount:recipientRecord})[method];
  const context={database:join(directory,'payments.db'),network,settlement,account,address:'testnet-fixture-recipient',amount:'0.01',nodeRpc,walletRpc,...await loadEndpointIdentity(providerIdentity),peers:{client:{encryptionKey:clientIdentity.encryption.publicKey,signingKey:clientIdentity.signing.publicKey}},now:()=>now};
+ if(invoiceLifetimeMs!==undefined)context.invoiceLifetimeMs=invoiceLifetimeMs;
  let paid=createPaidProvider(context);
  const id=randomUUID(),mandate={schema:'veildesk.mandate.v1',id,mode:'dry_run',market:'private-payment-fixture',side:'YES',maxSpendUsd:'5.00',limitPrice:'0.5',expiresAt:now+600000,approval:'preview_only'};
  await client.submit(mandate);const {job}=await rpc('/v1/provider/claim',{method:'POST',body:{}});
@@ -167,5 +168,12 @@ test('mainnet authenticated payment lifecycle preserves network and invoice cap 
   native.setInvoice(quote.invoice);const job=await f.fund();await f.process(job);
   const result=await f.client.get(job.id);assert.equal(result.result.payload.payment.network,'main');assert.equal(result.result.payload.tradeSubmitted,false);
   f.restart();await f.process(job);assert.deepEqual(await f.client.get(job.id),result);
+ }finally{await f.close();}
+});
+
+test('operator invoice lifetime remains bounded by the authenticated mandate',async()=>{
+ const f=await setup({invoiceLifetimeMs:2700000});
+ try{await f.process();const quote=(await f.client.get(f.job.id)).payment;assert.equal(quote.invoice.expiresAt,f.job.expiresAt);
+  for(const value of [0,NaN,3600001,'2700000'])assert.throws(()=>createPaidProvider({...f.context,invoiceLifetimeMs:value}),/invoice lifetime/);
  }finally{await f.close();}
 });
