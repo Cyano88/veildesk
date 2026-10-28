@@ -34,3 +34,13 @@ The final original working-tree suite passed 81 tests with two optional checks s
 Sanitized result: `output/mainnet-cloud-bridge-check.json`. Mainnet recording: `output/playwright/veildesk-mainnet-check.webm`; a 45-second result excerpt is `veildesk-mainnet-check.mp4`, and `mainnet-verified.png` captures the final screen. The local read-only evidence viewer displays the actual saved cloud command output; its source is `output/mainnet-proof-viewer.mjs`. The excerpt shortens the waiting period; raw footage is retained. This evidence contains no wallet address, secret or recovery material.
 
 Mainnet wallet and verification migration is complete. Before sending any real funds, the operator still needs the user's maximum ZEC budget including fees, funding source, a concrete authenticated invoice and payment approval. Paid fulfillment remains disabled.
+
+## Buyer funding preparation - 2026-10-28
+
+The user set a total budget of USD 1 including fees and confirmed they will fund from their own ZEC wallet. A separate mainnet buyer was created at `/var/data/veildesk-mainnet-buyer`, with its own lock and independent recovery password. Mainnet sync at height 3533228, native receiving-address ownership, and offline encrypted recovery all passed. The address differs from the service recipient.
+
+The encrypted initial checkpoint is 1258 bytes, SHA-256 `75008028aa84d50951244f0cfdb0e2dc45932ca45863937e1ee6424fc1b706de`. Operator state, the verified encrypted copy, receiving address, budget note and Windows-DPAPI-protected password are under ignored `private/mainnet-buyer-20261028/`. Preserve these files. Source helper: `scripts/mainnet-buyer-bootstrap.mjs`; run only under `/var/data/veildesk-mainnet-buyer.lock` with the independent password on stdin.
+
+The Coinbase spot response at 05:37:26 UTC quoted ZEC/USD 1315.04. Proposed buyer funding is 0.0004 ZEC (USD 0.526016 at that quote), provided the user's sending wallet shows a total including its fee of no more than USD 0.75. The remaining USD 0.25 is reserved for the later service-transfer fee. The planned service invoice is 0.0002 ZEC; the buyer invoice cap must be 20000 zatoshis. This is an operator budget note, not evidence of an executed transaction or an enabled service. Recheck price and actual fee before spending; do not exceed the user's total budget.
+
+Funding this buyer is separate from paying a fresh authenticated PolyDesk invoice. No buyer funding or service payment has been verified at this checkpoint. Paid fulfillment remains disabled.
