@@ -92,21 +92,21 @@ export function createRelay({database,principals,providers,now=Date.now,maxPendi
     }else if(req.url==='/v1/provider/payment-review'&&req.method==='POST'){
      if(principal.role!=='provider')fail(403,'Forbidden');const b=await body(req);exact(b,['client','id','envelope']);validateRelayEnvelope(b.envelope,b.id,'response');
      const row=db.prepare('SELECT * FROM relay_jobs WHERE client=? AND id=? AND provider=?').get(b.client,b.id,principal.id);if(!row)fail(404,'Job not found');
-     if(row.capability!=='prediction.mandate.validate.testnet-paid.v1'||row.state!=='processing')fail(409,'Job cannot enter payment review');
+     if(!['prediction.mandate.validate.testnet-paid.v1','prediction.mandate.validate.mainnet-paid.v1'].includes(row.capability)||row.state!=='processing')fail(409,'Job cannot enter payment review');
      const value=JSON.stringify(b.envelope);if(row.payment_review&&row.payment_review!==value)fail(409,'Payment review conflict');
      if(!row.payment_review)db.prepare('UPDATE relay_jobs SET payment_review=? WHERE client=? AND id=?').run(value,b.client,b.id);
      result={id:b.id,state:'payment_review',executionAuthorized:false};
     }else if(req.url==='/v1/provider/invoice'&&req.method==='POST'){
      if(principal.role!=='provider')fail(403,'Forbidden');const b=await body(req);exact(b,['client','id','envelope']);validateRelayEnvelope(b.envelope,b.id,'response');
      const row=db.prepare('SELECT * FROM relay_jobs WHERE client=? AND id=? AND provider=?').get(b.client,b.id,principal.id);if(!row)fail(404,'Job not found');
-     if(row.capability!=='prediction.mandate.validate.testnet-paid.v1'||!['processing','completed'].includes(row.state))fail(409,'Job is not awaiting a testnet invoice');
+     if(!['prediction.mandate.validate.testnet-paid.v1','prediction.mandate.validate.mainnet-paid.v1'].includes(row.capability)||!['processing','completed'].includes(row.state))fail(409,'Job is not awaiting a payment invoice');
      const value=JSON.stringify(b.envelope);if(row.invoice&&row.invoice!==value)fail(409,'Invoice conflict');
      if(!row.invoice){if(row.state!=='processing'||now()>=row.expires)fail(409,'Job expired or completed');db.prepare('UPDATE relay_jobs SET invoice=? WHERE client=? AND id=?').run(value,b.client,b.id)}
      result={id:b.id,state:'invoice_issued',executionAuthorized:false};
     }else if(req.method==='POST'&&/^\/v1\/jobs\/[a-f0-9-]+\/payment$/.test(req.url)){
      if(principal.role!=='client')fail(403,'Forbidden');const id=req.url.split('/')[3],b=await body(req);exact(b,['envelope']);validateRelayEnvelope(b.envelope,id,'request');
      const row=db.prepare('SELECT * FROM relay_jobs WHERE client=? AND id=?').get(principal.id,id);if(!row)fail(404,'Job not found');
-     if(!row.invoice||row.state!=='processing'||row.capability!=='prediction.mandate.validate.testnet-paid.v1')fail(409,'No pending testnet invoice');
+     if(!row.invoice||row.state!=='processing'||!['prediction.mandate.validate.testnet-paid.v1','prediction.mandate.validate.mainnet-paid.v1'].includes(row.capability))fail(409,'No pending payment invoice');
      const value=JSON.stringify(b.envelope);if(row.payment_hint&&row.payment_hint!==value)fail(409,'Payment hint conflict');
      if(!row.payment_hint)db.prepare('UPDATE relay_jobs SET payment_hint=? WHERE client=? AND id=?').run(value,principal.id,id);
      result={id,state:'evidence_submitted',executionAuthorized:false};

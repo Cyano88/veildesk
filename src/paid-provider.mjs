@@ -1,3 +1,4 @@
+import {walletNetwork,paidMandateCapability,paidResearchCapability,nativeBackendId} from './zcash-network.mjs';
 import {createZalletSettlement} from './settlement.mjs';
 import {DatabaseSync} from 'node:sqlite';
 import {createHash} from 'node:crypto';
@@ -12,9 +13,10 @@ export const paymentHash=value=>createHash('sha256').update(JSON.stringify(value
 // Testnet pilot only. The trusted endpoint verifies wallet evidence; the opaque relay cannot.
 // No spend RPC or automatic refund. Public availability remains disabled until live acceptance.
 export function createPaidProvider({database,network,account,address,amount,nodeRpc,walletRpc,recipient,signer,peers,now=Date.now,settlement}){
- if(network!=='test'||typeof account!=='string'||!/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(account)||typeof address!=='string'||!address||(!settlement&&(typeof nodeRpc!=='function'||typeof walletRpc!=='function')))throw Error('Invalid testnet payment configuration');zats(amount);
+ walletNetwork(network);if(network==='main'&&!settlement)throw Error('Mainnet requires native settlement');
+ if(typeof account!=='string'||!/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(account)||typeof address!=='string'||!address||(!settlement&&(typeof nodeRpc!=='function'||typeof walletRpc!=='function')))throw Error('Invalid testnet payment configuration');zats(amount);
  const paymentBackend=settlement??createZalletSettlement({nodeRpc,walletRpc,account,address});
- if(paymentBackend.address!==address||!/^(?:zallet-testnet-v1|zingolib-testnet-v1:[0-9]+)$/.test(paymentBackend.id)||['preflight','recipient','verify'].some(name=>typeof paymentBackend[name]!=='function'))throw Error('Invalid trusted settlement backend');
+ if(paymentBackend.address!==address||!(network==='test'&&paymentBackend.id==='zallet-testnet-v1'||/^zingolib-(?:mainnet|testnet)-v1:[0-9]+$/.test(paymentBackend.id)&&paymentBackend.id===nativeBackendId(network,Number(paymentBackend.id.split(':')[1])))||['preflight','recipient','verify'].some(name=>typeof paymentBackend[name]!=='function'))throw Error('Invalid trusted settlement backend');
  const db=new DatabaseSync(database);db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;
  CREATE TABLE IF NOT EXISTS paid_jobs(owner TEXT PRIMARY KEY,binding TEXT NOT NULL,issued INTEGER NOT NULL,invoice TEXT NOT NULL,challenge TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'awaiting',note TEXT,blockhash TEXT,result TEXT,review TEXT);
  CREATE TABLE IF NOT EXISTS paid_notes(note TEXT PRIMARY KEY,owner TEXT NOT NULL);`);
@@ -23,7 +25,7 @@ export function createPaidProvider({database,network,account,address,amount,node
  return {
   close:()=>db.close(),
   async process(job,{rpc}){
-   const peer=peers[job.client];if(!peer||job.capability!==PAID_CAPABILITY)throw Error('Unsupported or unenrolled paid job');
+   const peer=peers[job.client];if(!peer||job.capability!==paidMandateCapability(network))throw Error('Unsupported or unenrolled paid job');
    const owner=paymentHash([job.client,job.id]);let row=db.prepare('SELECT * FROM paid_jobs WHERE owner=?').get(owner);
    const request=await openSigned(job.envelope,{recipient,expectedSigner:peer.signingKey,id:job.id,direction:'request'});
    if(request?.schema!=='veildesk.job.v1'||request.route?.provider!==job.provider||request.route?.capability!==job.capability||request.route?.expiresAt!==job.expiresAt)throw Error('Paid job context mismatch');
@@ -46,8 +48,8 @@ export function createPaidProvider({database,network,account,address,amount,node
     await paymentBackend.preflight();
     await paymentBackend.recipient();
     const issued=now();validateMandate(mandate,issued);
-    const i=invoice({address,amount,network:'test',now:issued});i.expiresAt=Math.min(i.expiresAt,mandate.expiresAt);
-    const challenge=await sealPrivateResult(job,{status:'payment_required',network:'test',invoice:i,invoiceHash:paymentHash(i),mandateHash:paymentHash(mandate),tradeSubmitted:false},{signer,recipientPublicKey:peer.encryptionKey});
+    const i=invoice({address,amount,network,now:issued});i.expiresAt=Math.min(i.expiresAt,mandate.expiresAt);
+    const challenge=await sealPrivateResult(job,{status:'payment_required',network,invoice:i,invoiceHash:paymentHash(i),mandateHash:paymentHash(mandate),tradeSubmitted:false},{signer,recipientPublicKey:peer.encryptionKey});
     db.prepare('INSERT OR IGNORE INTO paid_jobs(owner,binding,issued,invoice,challenge) VALUES(?,?,?,?,?)').run(owner,binding,issued,JSON.stringify(i),JSON.stringify(challenge));
     row=db.prepare('SELECT * FROM paid_jobs WHERE owner=?').get(owner);if(row.binding!==binding)throw Error('Paid job binding conflict');
    }
@@ -75,7 +77,7 @@ export function createPaidProvider({database,network,account,address,amount,node
      db.exec('COMMIT');
     }catch(error){try{db.exec('ROLLBACK')}catch{}throw error}
     if(!reserved)throw Error('Concurrent or uncertain paid result; reconcile before retry');
-    const result=await sealPrivateResult(job,{status:'validated',mandate,marketVerified:false,paymentVerified:true,tradeSubmitted:false,payment:{network:'test',txid:hint.txid,noteId:receipt.noteId,blockhash:receipt.blockhash,confirmations:receipt.confirmations,invoiceHash:paymentHash(i),mandateHash:paymentHash(mandate)}},{signer,recipientPublicKey:peer.encryptionKey});
+    const result=await sealPrivateResult(job,{status:'validated',mandate,marketVerified:false,paymentVerified:true,tradeSubmitted:false,payment:{network,txid:hint.txid,noteId:receipt.noteId,blockhash:receipt.blockhash,confirmations:receipt.confirmations,invoiceHash:paymentHash(i),mandateHash:paymentHash(mandate)}},{signer,recipientPublicKey:peer.encryptionKey});
     db.prepare("UPDATE paid_jobs SET result=?,state='ready' WHERE owner=? AND state='preparing'").run(JSON.stringify(result),owner);
     row=db.prepare('SELECT * FROM paid_jobs WHERE owner=?').get(owner);
    }

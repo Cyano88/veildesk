@@ -1,3 +1,4 @@
+import {walletNetwork,paidMandateCapability,paidResearchCapability} from './zcash-network.mjs';
 import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
@@ -10,8 +11,9 @@ const hash=value=>createHash('sha256').update(value).digest('hex');
 const digest=value=>hash(JSON.stringify(value));
 const FREE='prediction.mandate.validate.v1',PAID='prediction.mandate.validate.testnet-paid.v1';
 export async function createMandateClient({config,stateDirectory}){
- const capability=config.capability??FREE,paid=capability===PAID;
- if(!stateDirectory||![FREE,PAID].includes(capability)||!config.provider?.capabilities?.includes(capability))throw Error('Missing client state or provider capability');
+ const network=config.network??'test';walletNetwork(network);const paidCapability=paidMandateCapability(network),researchCapability=paidResearchCapability(network);
+ const capability=config.capability??FREE,paid=capability===paidCapability;
+ if(!stateDirectory||![FREE,paidCapability].includes(capability)||!config.provider?.capabilities?.includes(capability))throw Error('Missing client state or provider capability');
  if(paid&&(typeof config.maxPaymentZat!=='string'||!/^\d{1,16}$/.test(config.maxPaymentZat)||BigInt(config.maxPaymentZat)<=0n))throw Error('Set an explicit testnet invoice amount cap');
  const {recipient,signer}=await loadEndpointIdentity(config.identity),rpc=relayClient(config);
  const directory=join(stateDirectory,hash(JSON.stringify([config.url,config.provider.id,config.provider.encryptionKey,config.provider.signingKey,signer.publicKey,recipient.publicKey])));
@@ -25,9 +27,9 @@ export async function createMandateClient({config,stateDirectory}){
  async function challenge(job,mandateHash){
   if(!job.invoiceEnvelope)return null;
   const result=await openPrivateResult({...job,envelope:job.invoiceEnvelope},{recipient,expectedSigner:config.provider.signingKey}),p=result.payload;
-  if(!paid||p?.status!=='payment_required'||p.network!=='test'||p.mandateHash!==mandateHash||p.tradeSubmitted!==false)throw Error('Invalid payment challenge');
+  if(!paid||p?.status!=='payment_required'||p.network!==network||p.mandateHash!==mandateHash||p.tradeSubmitted!==false)throw Error('Invalid payment challenge');
   validateInvoice(p.invoice);
-  if(p.invoice.network!=='test'||p.invoice.expiresAt>job.expiresAt||digest(p.invoice)!==p.invoiceHash||BigInt(p.invoice.amountZat)>BigInt(config.maxPaymentZat))throw Error('Invoice terms exceed configured authorization');
+  if(p.invoice.network!==network||p.invoice.expiresAt>job.expiresAt||digest(p.invoice)!==p.invoiceHash||BigInt(p.invoice.amountZat)>BigInt(config.maxPaymentZat))throw Error('Invoice terms exceed configured authorization');
   return p;
  }
  return {
@@ -62,7 +64,7 @@ export async function createMandateClient({config,stateDirectory}){
     if(digest(result.payload.mandate)!==mandateHash||result.payload.paymentVerified!==paid||result.payload.marketVerified!==false)throw Error('Provider validation does not match the original mandate');
     if(paid){
      const hint=JSON.parse(await readFile(join(directory,'payment-hints',hash(id)+'.json'),'utf8')),p=result.payload.payment;
-     if(!quote||p?.network!=='test'||p.txid!==hint.txid||p.invoiceHash!==quote.invoiceHash||p.mandateHash!==mandateHash||!Number.isSafeInteger(p.confirmations)||p.confirmations<3||typeof p.blockhash!=='string'||!/^[a-f0-9]{64}$/.test(p.blockhash)||typeof p.noteId!=='string'||!p.noteId.startsWith(p.txid+':'))throw Error('Invalid provider payment receipt');
+     if(!quote||p?.network!==network||p.txid!==hint.txid||p.invoiceHash!==quote.invoiceHash||p.mandateHash!==mandateHash||!Number.isSafeInteger(p.confirmations)||p.confirmations<3||typeof p.blockhash!=='string'||!/^[a-f0-9]{64}$/.test(p.blockhash)||typeof p.noteId!=='string'||!p.noteId.startsWith(p.txid+':'))throw Error('Invalid provider payment receipt');
     }
    }
    return {id,state:job.state,result,late:Date.now()>=request.expiresAt,executionAuthorized:false};

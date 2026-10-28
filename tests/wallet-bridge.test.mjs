@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {walletCapability,nativeBackendId} from '../src/zcash-network.mjs';
 import assert from 'node:assert/strict';
 import {mkdtemp,rm,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';import {join} from 'node:path';
@@ -9,20 +10,20 @@ import {relayClient,sealPrivateResult,preparePrivateJob} from '../src/client.mjs
 import {createRelay} from '../src/relay.mjs';import {invoice} from '../src/zcash.mjs';
 import {WALLET_CAPABILITY,createRemoteWalletSettlement,createWalletBridgeProcessor} from '../src/wallet-bridge.mjs';
 const hash=x=>createHash('sha256').update(x).digest('hex');
-async function fixture(){
+async function fixture(network='test'){
  const directory=await mkdtemp(join(tmpdir(),'wallet-bridge-'));
  const wallet={recipient:await identity(),signer:await signingIdentity()},provider={recipient:await identity(),signer:await signingIdentity()};
- const descriptor={id:'wallet',encryptionKey:wallet.recipient.publicKey,signingKey:wallet.signer.publicKey,capabilities:[WALLET_CAPABILITY],allowedClients:['provider-client']};
+ const descriptor={id:'wallet',encryptionKey:wallet.recipient.publicKey,signingKey:wallet.signer.publicKey,capabilities:[walletCapability(network)],allowedClients:['provider-client']};
  const address='private-testnet-receiver-fixture',txid='a'.repeat(64);let checks=0;
- const backend={id:'zingolib-testnet-v1:0',address,preflight:async()=>{checks++;return {recipientTracked:true,settlementVerified:false,executionAuthorized:false}},
+ const backend={id:nativeBackendId(network,0),address,preflight:async()=>{checks++;return {recipientTracked:true,settlementVerified:false,executionAuthorized:false}},
  verify:async({invoice:i,txid:t})=>{checks++;assert.equal(t,txid);assert.equal(i.address,address);return {state:'confirmed',noteId:t+':ironwood:0',blockhash:'b'.repeat(64),height:100,confirmations:3,executionAuthorized:false}}};
  const relay=createRelay({database:join(directory,'relay.db'),principals:[{id:'provider-client',role:'client',tokenHash:hash('c'.repeat(40))},{id:'wallet',role:'provider',tokenHash:hash('w'.repeat(40))},{id:'outsider',role:'client',tokenHash:hash('s'.repeat(40))}],providers:[descriptor]});
  relay.server.listen(0,'127.0.0.1');await once(relay.server,'listening');const url='http://127.0.0.1:'+relay.server.address().port;
  const rpc=relayClient({url,allowLoopback:true,token:'c'.repeat(40)}),walletRpc=relayClient({url,allowLoopback:true,token:'w'.repeat(40)});
- const process=createWalletBridgeProcessor({providerId:'wallet',accountId:0,address,backend,...wallet,peers:{'provider-client':{signingKey:provider.signer.publicKey,encryptionKey:provider.recipient.publicKey}},stateDirectory:join(directory,'wallet')});
+ const process=createWalletBridgeProcessor({providerId:'wallet',accountId:0,address,backend,...wallet,peers:{'provider-client':{signingKey:provider.signer.publicKey,encryptionKey:provider.recipient.publicKey}},stateDirectory:join(directory,'wallet'),network});
  let stop=false,lastJob;
  const pump=(async()=>{while(!stop){const {job}=await walletRpc('/v1/provider/claim',{method:'POST',body:{}});if(job){lastJob=job;await process(job,{rpc:walletRpc})}await pause(5)}})();
- const remote=createRemoteWalletSettlement({rpc,provider:descriptor,...provider,accountId:0,address,pollMs:5,timeoutMs:5000});
+ const remote=createRemoteWalletSettlement({rpc,provider:descriptor,...provider,accountId:0,address,pollMs:5,timeoutMs:5000,network});
  return {outsider:relayClient({url,allowLoopback:true,token:'s'.repeat(40)}),directory,wallet,provider,descriptor,address,txid,backend,remote,rpc,walletRpc,process,checks:()=>checks,lastJob:()=>lastJob,
  close:async()=>{stop=true;await pump;await relay.close();await rm(directory,{recursive:true,force:true})}};
 }
@@ -49,5 +50,18 @@ test('bridge rejects wrong scope before wallet access and rejects stale signed r
    const envelope=await sealPrivateResult(job,{schema:'veildesk.wallet-result.v1',operation:'preflight',queryHash:hash(JSON.stringify({schema:'veildesk.wallet-query.v1',operation:'preflight',accountId:0,address:f.address})),status:'ok',result:{recipientTracked:true,settlementVerified:false,executionAuthorized:false},observedAt:Date.now()-60000,expiresAt:Date.now()+10000,executionAuthorized:false},{signer:f.wallet.signer,recipientPublicKey:f.provider.recipient.publicKey});return {state:'completed',envelope}};
   const remote=createRemoteWalletSettlement({rpc,provider:f.descriptor,...f.provider,accountId:0,address:f.address,pollMs:5,timeoutMs:5000});
   await assert.rejects(remote.preflight(),/stale authenticated/);
+ }finally{await f.close()}
+});
+
+test('mainnet bridge has distinct authenticated capability and rejects testnet invoice before transport',async()=>{
+ const f=await fixture('main');try{
+  assert.equal(f.remote.id,'zingolib-mainnet-v1:0');
+  assert.equal((await f.remote.preflight()).recipientTracked,true);
+  await assert.rejects(f.remote.verify({invoice:invoice({address:f.address,amount:'0.001',network:'test'}),txid:f.txid}),/scoped wallet payment/);
+  assert.equal(f.checks(),1);
+  assert.equal((await f.remote.verify({invoice:invoice({address:f.address,amount:'0.001',network:'main'}),txid:f.txid})).state,'confirmed');
+  assert.throws(()=>createRemoteWalletSettlement({rpc:f.rpc,provider:f.descriptor,...f.provider,accountId:0,address:f.address,network:'test'}),/configuration/);
+  const wrong=await preparePrivateJob({id:crypto.randomUUID(),provider:{...f.descriptor,capabilities:[WALLET_CAPABILITY]},capability:WALLET_CAPABILITY,expiresAt:Date.now()+5000,payload:{},signer:f.provider.signer});
+  await assert.rejects(f.process({...wrong,client:'provider-client'},{rpc:f.walletRpc}),/Unenrolled/);
  }finally{await f.close()}
 });

@@ -1,3 +1,4 @@
+import {walletNetwork,walletCapability,nativeBackendId} from './zcash-network.mjs';
 import {randomUUID,createHash} from 'node:crypto';
 import {join} from 'node:path';
 import {setTimeout as pause} from 'node:timers/promises';
@@ -7,19 +8,20 @@ import {validateInvoice} from './zcash.mjs';
 export const WALLET_CAPABILITY='zcash.receipt.check.testnet.v1';
 const hash=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');
 const hex=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
-function validateQuery(query,{accountId,address}){
+function validateQuery(query,{accountId,address,network}){
  const fields=query?.operation==='preflight'?['schema','operation','accountId','address']:['schema','operation','accountId','address','invoice','txid'];
  if(!query||Object.keys(query).length!==fields.length||Object.keys(query).some(k=>!fields.includes(k))||query.schema!=='veildesk.wallet-query.v1'
   ||!['preflight','verify'].includes(query.operation)||query.accountId!==accountId||query.address!==address)throw Error('Invalid scoped wallet request');
- if(query.operation==='verify'){validateInvoice(query.invoice);if(query.invoice.network!=='test'||query.invoice.address!==address||!hex(query.txid))throw Error('Invalid scoped wallet payment')}
+ if(query.operation==='verify'){validateInvoice(query.invoice);if(query.invoice.network!==network||query.invoice.address!==address||!hex(query.txid))throw Error('Invalid scoped wallet payment')}
  return query;
 }
-export function createWalletBridgeProcessor({providerId,accountId,address,backend,recipient,signer,peers,stateDirectory,now=Date.now}){
- if(backend.address!==address||backend.id!==`zingolib-testnet-v1:${accountId}`)throw Error('Wallet backend identity mismatch');
+export function createWalletBridgeProcessor({providerId,accountId,address,backend,recipient,signer,peers,stateDirectory,now=Date.now,network='test'}){
+ walletNetwork(network);const capability=walletCapability(network);
+ if(backend.address!==address||backend.id!==nativeBackendId(network,accountId))throw Error('Wallet backend identity mismatch');
  return async(job,{rpc})=>{
   const peer=peers[job.client];
-  if(!peer||job.provider!==providerId||job.capability!==WALLET_CAPABILITY)throw Error('Unenrolled wallet request');
-  const query=validateQuery(await openPrivateJob(job,{recipient,expectedSigner:peer.signingKey}),{accountId,address});
+  if(!peer||job.provider!==providerId||job.capability!==capability)throw Error('Unenrolled wallet request');
+  const query=validateQuery(await openPrivateJob(job,{recipient,expectedSigner:peer.signingKey}),{accountId,address,network});
   const binding={id:job.id,client:job.client,provider:job.provider,capability:job.capability,expiresAt:job.expiresAt,envelope:job.envelope,
    requesterSigningKey:peer.signingKey,requesterEncryptionKey:peer.encryptionKey,walletSigningKey:signer.publicKey,walletEncryptionKey:recipient.publicKey};
   const envelope=await oncePerMandate(join(stateDirectory,hash(job.client)),binding,async()=>{
@@ -33,13 +35,14 @@ export function createWalletBridgeProcessor({providerId,accountId,address,backen
   return rpc('/v1/provider/deliver',{method:'POST',body:{client:job.client,id:job.id,envelope}});
  };
 }
-export function createRemoteWalletSettlement({rpc,provider,recipient,signer,accountId,address,now=Date.now,pollMs=1000,timeoutMs=600000}){
- if(typeof rpc!=='function'||!provider?.capabilities?.includes(WALLET_CAPABILITY)||!Number.isSafeInteger(accountId)||accountId<0||accountId>0x7fffffff
+export function createRemoteWalletSettlement({rpc,provider,recipient,signer,accountId,address,now=Date.now,pollMs=1000,timeoutMs=600000,network='test'}){
+ walletNetwork(network);const capability=walletCapability(network);
+ if(typeof rpc!=='function'||!provider?.capabilities?.includes(capability)||!Number.isSafeInteger(accountId)||accountId<0||accountId>0x7fffffff
   ||typeof address!=='string'||!address||!Number.isSafeInteger(timeoutMs)||timeoutMs<100||timeoutMs>600000||!Number.isSafeInteger(pollMs)||pollMs<1)throw Error('Invalid remote wallet configuration');
  async function request(operation,payment={}){
-  const query=validateQuery({schema:'veildesk.wallet-query.v1',operation,accountId,address,...payment},{accountId,address});
+  const query=validateQuery({schema:'veildesk.wallet-query.v1',operation,accountId,address,...payment},{accountId,address,network});
   const started=now(),expiresAt=started+timeoutMs;
-  const job=await preparePrivateJob({id:randomUUID(),provider,capability:WALLET_CAPABILITY,expiresAt,payload:query,signer});
+  const job=await preparePrivateJob({id:randomUUID(),provider,capability,expiresAt,payload:query,signer});
   await rpc('/v1/jobs',{method:'POST',body:job});
   while(now()<expiresAt){
    const row=await rpc('/v1/jobs/'+job.id);
@@ -67,6 +70,6 @@ export function createRemoteWalletSettlement({rpc,provider,recipient,signer,acco
   throw Error('Wallet request timed out');
  }
  const preflight=()=>request('preflight');
- return {id:`zingolib-testnet-v1:${accountId}`,address,preflight,recipient:preflight,
+ return {id:nativeBackendId(network,accountId),address,preflight,recipient:preflight,
   verify:({invoice,txid})=>request('verify',{invoice,txid})};
 }

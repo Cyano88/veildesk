@@ -14,6 +14,6 @@ const keys=await loadEndpointIdentity(config.identity);
 const backend=createRemoteWalletSettlement({...config,...keys,rpc:relayClient(config)});
 const preflight=await backend.preflight();
 let unknownPaymentState;
-if(process.argv.includes('--unknown-payment'))unknownPaymentState=(await backend.verify({invoice:invoice({address:config.address,amount:'0.001',network:'test'}),txid:'0'.repeat(64)})).state;
+if(process.argv.includes('--unknown-payment'))unknownPaymentState=(await backend.verify({invoice:invoice({address:config.address,amount:'0.001',network:config.network??'test'}),txid:'0'.repeat(64)})).state;
 if(unknownPaymentState!==undefined&&unknownPaymentState!=='awaiting_payment')throw Error('Unknown payment did not fail closed');
-console.log(JSON.stringify({bridgeAuthenticated:true,recipientTracked:preflight.recipientTracked,unknownPaymentState,settlementVerified:false,tradeSubmitted:false}));
+console.log(JSON.stringify({network:config.network??'test',bridgeAuthenticated:true,recipientTracked:preflight.recipientTracked,unknownPaymentState,settlementVerified:false,tradeSubmitted:false}));
