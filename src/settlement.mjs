@@ -13,13 +13,15 @@ export function createZalletSettlement({nodeRpc,walletRpc,account,address}){
 export function createLightWalletSettlement({capture,accountId,address,now=Date.now,network='test'}){
  walletNetwork(network);
  if(typeof capture!=='function'||!Number.isSafeInteger(accountId)||accountId<0||accountId>0x7fffffff||typeof address!=='string'||!address)throw Error('Invalid native settlement configuration');
- const preflight=async()=>{
-  const snapshot=await capture({accountId,address,txid:'0'.repeat(64)});
+ const checkedCapture=async query=>{
+  const snapshot=await capture(query);
   verifyLightWalletSnapshot(snapshot,{address,accountId,now:now(),network});
   const branches=network==='test'?supported:new Set(['37a5165b']);
   if(!branches.has(snapshot.scan.consensusBranchId))throw Error('Active network upgrade is unsupported by the payment verifier');
-  return {recipientTracked:true,settlementVerified:false,executionAuthorized:false};
+  return snapshot;
+ };
+ const preflight=async()=>{await checkedCapture({accountId,address,txid:'0'.repeat(64)});return {recipientTracked:true,settlementVerified:false,executionAuthorized:false};
  };
  return {id:nativeBackendId(network,accountId),address,preflight,recipient:preflight,
-  verify:({invoice,txid,now:verifiedAt})=>verifyLightWalletReceipt({capture,invoice,accountId,txid,network,now:verifiedAt===undefined?now:()=>Math.max(verifiedAt,now())})};
+  verify:({invoice,txid,now:verifiedAt})=>verifyLightWalletReceipt({capture:checkedCapture,invoice,accountId,txid,network,now:verifiedAt===undefined?now:()=>Math.max(verifiedAt,now())})};
 }

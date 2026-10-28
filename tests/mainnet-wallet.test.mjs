@@ -29,3 +29,13 @@ test('mainnet recovery persists separately and rejects network reuse before any 
   assert.equal((await readFile(join(root,'recovery.initial.json'),'utf8')).includes('mainnet-fixture-secret'),false);
  }finally{await rm(root,{recursive:true,force:true})}
 });
+
+test('mainnet rejects unsupported consensus branch during receipt verification, not only preflight',async()=>{
+ const {createLightWalletSettlement}=await import('../src/settlement.mjs');
+ const {nativePaymentFixture}=await import('./fixtures/native-payment.mjs');
+ const {invoice}=await import('../src/zcash.mjs');
+ const address='mainnet-fixture',txid='a'.repeat(64),fixture=nativePaymentFixture({address,txid,now:Date.now,network:'main'});
+ const backend=createLightWalletSettlement({capture:fixture.capture,address,accountId:0,network:'main'});
+ await backend.preflight();fixture.setBranch('ffffffff');
+ await assert.rejects(backend.verify({invoice:invoice({address,amount:'0.001',network:'main'}),txid}),/unsupported/);
+});
