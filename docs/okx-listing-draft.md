@@ -1,5 +1,7 @@
 # Listing preparation — not submitted
 
+> Historical draft below. Do not submit the research-agent wording: PolyDesk owns research. See [current marketplace preparation](okx-marketplace-readiness.md) for the proposed scope, integration package and remaining launch gates.
+
 Working agent name: VeilDesk
 
 Proposed service: Private Prediction Research

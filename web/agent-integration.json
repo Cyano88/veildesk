@@ -1,0 +1,52 @@
+{
+  "schema": "veildesk.agent-integration.v1",
+  "name": "VeilDesk",
+  "description": "Authenticated encrypted agent requests, shielded Zcash settlement and encrypted delivery. PolyDesk supplies the research service.",
+  "relay": "https://veildesk-relay.onrender.com",
+  "openapi": "/openapi.json",
+  "integrationGuide": "/agent-integration.md",
+  "repository": "https://github.com/Cyano88/veildesk",
+  "access": {
+    "enrollment": "operator-managed",
+    "selfService": false,
+    "clientSideEncryptionRequired": true,
+    "pinProviderKeysOutOfBand": true,
+    "contact": "https://x.com/UseVeilDesk"
+  },
+  "interfaces": {
+    "https": "enrolled asynchronous jobs; credentials stay inside the buyer runtime",
+    "mcp": "client-side stdio adapter; preview validation only; no public hosted MCP endpoint"
+  },
+  "capabilities": [
+    {"id": "prediction.mandate.validate.v1", "access": "enrolled", "scope": "preview contract validation only; no research, settlement or trading"},
+    {"id": "polydesk.research.mainnet-paid.v1", "access": "restricted-pilot", "scope": "PolyDesk research; separately approved shielded ZEC invoice"}
+  ],
+  "settlement": {
+    "asset": "ZEC",
+    "network": "mainnet",
+    "automaticPayment": false,
+    "marketplaceNativeCheckout": false,
+    "pilotServiceZat": "20000",
+    "pilotNetworkFeeZat": "10000",
+    "pilotAmountsArePublicPriceQuote": false
+  },
+  "marketplace": {
+    "okxListed": false,
+    "baseListed": false,
+    "readyForUnattendedPaidListing": false,
+    "blockers": [
+      "Choose and approve exact marketplace service scope and pricing",
+      "Demonstrate a complete marketplace invocation without requesting sensitive credentials",
+      "Resolve ZEC settlement compatibility separately from OKX native checkout",
+      "Complete dedicated buyer enrollment and acceptance for the listed service",
+      "Register, pass review and activate the separate VeilDesk identity"
+    ]
+  },
+  "privacy": {
+    "providerSeesAuthorizedRequest": true,
+    "networkAnonymity": false,
+    "walletAndIndexerTrusted": true,
+    "independentSecurityAudit": false,
+    "tradeExecutionAuthorized": false
+  }
+}

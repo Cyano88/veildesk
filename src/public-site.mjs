@@ -2,10 +2,13 @@ import {stat} from 'node:fs/promises';
 import {createReadStream} from 'node:fs';
 import {pipeline} from 'node:stream/promises';
 const files=new Map([
+ ['/agent-integration.json',['../web/agent-integration.json','application/json; charset=utf-8']],
+ ['/agent-integration.md',['../web/agent-integration.md','text/markdown; charset=utf-8']],
  ['/', ['../web/index.html','text/html; charset=utf-8']],
  ['/brand/polydesk.svg',['../web/brand/polydesk.svg','image/svg+xml']],
  ['/brand/zcash.svg',['../web/brand/zcash.svg','image/svg+xml']],
  ['/brand/okx-ai.png',['../web/brand/okx-ai.png','image/png']],
+ ['/openapi.json',['../web/openapi.json','application/json; charset=utf-8']],
  ['/favicon.svg',['../web/favicon.svg','image/svg+xml']],
  ['/favicon.png',['../web/favicon.png','image/png']],
  ['/app.mjs',['../web/app.mjs','text/javascript; charset=utf-8']],

@@ -1,3 +1,5 @@
+> Historical preview/operator guide. For the enrolled encrypted buyer protocol, paid research flow and SDK-independent reference, see [Encrypted HTTP integration](encrypted-http.md). The cloud/mainnet pilot is documented in [the current README](../README.md).
+
 # VeilDesk relay API and operator runbook
 
 Scope: `docs/product-scope.md`. This is a local single-host integration build. It is
