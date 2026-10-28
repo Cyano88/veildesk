@@ -9,11 +9,12 @@ RUN mkdir -p /opt/veildesk-wallet && cd /opt/veildesk-wallet && \
     curl -fLsS "https://github.com/Cyano88/veildesk/releases/download/${WALLET_RELEASE}/wallet-kit.tar.gz.sha256" -o kit.sha256 && \
     echo "f8d65345681dbc4d99d210992bf545424879ec6e437e887fcb0713fe340ad5ac  kit.tar.gz" | sha256sum -c - && tar -xzf kit.tar.gz && rm kit.tar.gz kit.sha256 && \
     test "$(cat source-commit.txt)" = bfb0a2156819ea7f75a9b09b1724abfd06c8925e && chmod 700 zingo-cli nym-proxy
-RUN curl -fLsS https://github.com/Cyano88/veildesk/releases/download/wallet-evidence-bfb0a21-v1/veildesk-evidence -o /opt/veildesk-wallet/veildesk-evidence && \
-    echo "4fbeab26d309c3dfe10acdfc5c7f5bb0912e2672b6679f4981e3a4f1b422e0e1  /opt/veildesk-wallet/veildesk-evidence" | sha256sum -c - && \
+RUN curl -fLsS https://github.com/Cyano88/veildesk/releases/download/wallet-evidence-bfb0a21-v2/veildesk-evidence -o /opt/veildesk-wallet/veildesk-evidence && \
+    echo "126a0f8f2932ea889370383d0d6693e503908b63a31e3f0fed96d2123213840d  /opt/veildesk-wallet/veildesk-evidence" | sha256sum -c - && \
     chmod 700 /opt/veildesk-wallet/veildesk-evidence
 COPY src ./src/
-COPY scripts/light-wallet-worker.mjs scripts/testnet-buyer-bootstrap.mjs ./scripts/
+COPY scripts/light-wallet-worker.mjs scripts/testnet-buyer-bootstrap.mjs scripts/mainnet-wallet-bootstrap.mjs ./scripts/
 ENV ZINGO_NYM_PROXY=/opt/veildesk-wallet/nym-proxy
 # No network listener, wallet RPC, spend command or publicly exposed port.
-CMD ["flock","--no-fork","/var/data/veildesk-wallet-process.lock","node","scripts/light-wallet-worker.mjs"]
+COPY ops/light-wallet/entrypoint.sh ./ops/light-wallet/entrypoint.sh
+CMD ["sh","ops/light-wallet/entrypoint.sh"]
