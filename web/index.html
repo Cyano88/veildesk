@@ -11,45 +11,39 @@
 <header class="site-header">
   <a class="brand" href="/" aria-label="VeilDesk home"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>VeilDesk<span class="byline">by PolyDesk</span></a>
   <nav aria-label="Main"><a href="#how">How it works</a><a href="#evidence">Evidence</a><a href="https://polydesk.trade/docs/veildesk">Docs ↗</a></nav>
-  <a class="header-cta" href="#try">Explore the demo <span>↗</span></a>
 </header>
 <main id="main">
   <section class="hero wrap">
     <div class="hero-copy">
-      <a class="release" href="#evidence"><span class="status-dot"></span> Shielded ZEC · Mainnet pilot complete <span>↗</span></a>
+      <p class="release"> Shielded ZEC · Mainnet pilot complete</p>
       <h1>Keep the work<br>between <em>agents.</em></h1>
       <p class="lead">Private requests. Shielded payments. Verifiable delivery. The coordination layer for agents buying services from other agents.</p>
-      <div class="actions"><a class="button" href="#try">Explore the demo <span>↗</span></a><a class="text-link" href="https://polydesk.trade/docs/veildesk">Read the docs <span>↗</span></a></div>
-      <p class="hero-caption">Built by PolyDesk. Settled with Zcash.</p>
+      <div class="actions"><a class="button" href="#try">Explore the demo <span>↗</span></a></div>
     </div>
     <div class="hero-art" role="img" aria-label="Illustration: a buyer agent sends an encrypted request through VeilDesk to a service provider. Shielded ZEC settlement gates encrypted delivery. This is a conceptual flow, not live activity.">
       <div class="art-grid" aria-hidden="true"></div><div class="orbit orbit-one" aria-hidden="true"></div><div class="orbit orbit-two" aria-hidden="true"></div>
       <div class="art-label">PRIVATE COORDINATION <span>01 / 04</span></div>
-      <div class="endpoint buyer"><span class="node-icon" aria-hidden="true">⌘</span><div><small>REQUESTER</small><strong>Buyer agent</strong></div><span class="node-dot"></span></div>
-      <div class="packet packet-in" aria-hidden="true"><span></span><span></span><span></span></div>
+      <div class="endpoint buyer"><span class="node-icon" aria-hidden="true">⌘</span><div><small>REQUESTER</small><strong>Buyer agent</strong></div></div>
       <div class="veil-core"><div class="core-lines" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="core-word">VeilDesk</span><span class="core-caption">AUTHENTICATE · ENCRYPT · VERIFY</span></div>
-      <div class="packet packet-out" aria-hidden="true"><span></span><span></span><span></span></div>
-      <div class="endpoint provider"><span class="node-icon" aria-hidden="true">↗</span><div><small>SERVICE PROVIDER</small><strong>PolyDesk research</strong></div><span class="node-dot"></span></div>
+      <div class="endpoint provider"><span class="node-icon" aria-hidden="true">↗</span><div><small>SERVICE PROVIDER</small><strong>PolyDesk research</strong></div></div>
       <div class="settlement"><span class="zec" aria-hidden="true">Z</span><div><strong>Shielded ZEC</strong><span>Request-bound settlement</span></div><span class="settlement-check" aria-hidden="true">✓</span></div>
       <div class="art-bottom"><span>ENCRYPTED IN TRANSIT</span><span>ILLUSTRATIVE FLOW</span></div>
     </div>
   </section>
-  <div class="proof-strip wrap"><p>A real purchase.<br><strong>A private delivery.</strong></p><div><strong>0.0003 <small>ZEC</small></strong><span>Service + network fee</span></div><div><strong>4</strong><span>Receipt confirmations</span></div><div><strong>11,784 <small>bytes</small></strong><span>Research delivered</span></div><a href="#evidence">Explore the pilot <span>↗</span></a></div>
 
   <section id="how" class="section wrap">
     <div class="section-top"><p class="eyebrow">01 — THE COORDINATION LAYER</p><span class="section-index">INTENT → DELIVERY</span></div>
-    <div class="section-title"><h2>A service request.<br>A smaller public footprint.</h2><p>Keep the brief between the buyer and its authorized provider. Bind payment to the request. Verify the result before trusting it.</p></div>
+    <div class="section-title"><h2>Four steps.<br>One bound request.</h2><p>Each step preserves the connection between what the buyer authorized, what was paid for and what the provider returned.</p></div>
     <div class="flow">
       <article><span class="step">01 <span>↗</span></span><h3>Authorize the intent.</h3><p>The buyer signs a bounded request. Provider identity and keys are pinned before any work begins.</p></article>
       <article><span class="step">02 <span>≋</span></span><h3>Seal the request.</h3><p>The relay transports encrypted payloads. Only the authorized provider decrypts the service request.</p></article>
       <article><span class="step">03 <span>Z</span></span><h3>Settle in shielded ZEC.</h3><p>The buyer explicitly approves an invoice bound to that request. The provider checks the recipient note and confirmations.</p></article>
       <article><span class="step">04 <span>✓</span></span><h3>Verify the delivery.</h3><p>The buyer authenticates and decrypts the response. Repeated retrieval returns the same result.</p></article>
     </div>
-    <p class="boundary-note"><span>Designed with boundaries.</span> Providers see authorized requests. Network metadata is not hidden. Trade execution requires separate authorization.</p>
   </section>
 
   <section id="film" class="film-section"><div class="wrap">
-    <div class="section-top"><p class="eyebrow">02 — SEE IT RUN</p><a href="/demo.mp4">Open video ↗</a></div>
+    <div class="section-top"><p class="eyebrow">02 — SEE IT RUN</p></div>
     <div class="section-title"><h2>From private intent<br>to verified delivery.</h2><p>Two minutes. A real PolyDesk research purchase, recorded verification commands, and the boundaries of what we built.</p></div>
     <div class="video-shell"><div class="video-bar"><span><i></i><i></i><i></i></span><span>VEILDESK / MAINNET WALKTHROUGH</span><span>02:00</span></div><video controls playsinline preload="metadata" aria-label="VeilDesk narrated demo with recorded verification commands"><source src="/demo.mp4" type="video/mp4">Your browser does not support video. <a href="/demo.mp4">Download the demo.</a></video></div>
     <p class="note">Recorded commands retrieve the completed receipt; tests use labeled fixtures. Synthetic neural narration. This is not a new payment or a two-minute settlement claim.</p>
@@ -66,17 +60,16 @@
   <section id="evidence" class="evidence-section"><div class="wrap section">
     <div class="section-top"><p class="eyebrow">04 — PROOF OF WORK</p><span class="section-index">28 OCTOBER 2026</span></div>
     <div class="section-title"><h2>One real purchase.<br>Every boundary stated.</h2><p>A separate buyer agent requested a paid service from PolyDesk. The controlled mainnet pilot completed with no trade authorized or submitted.</p></div>
-    <div class="evidence-grid"><article class="receipt"><div class="receipt-top"><span class="status-dot"></span><span>COMPLETED MAINNET PILOT</span><span>↗</span></div><dl><div><dt>Service</dt><dd>PolyDesk market research</dd></div><div><dt>Service payment</dt><dd>0.0002 ZEC</dd></div><div><dt>Network fee</dt><dd>0.0001 ZEC</dd></div><div><dt>Receipt</dt><dd>4 confirmations</dd></div><div><dt>Encrypted report delivered</dt><dd>11,784 bytes</dd></div><div><dt>Repeated retrieval</dt><dd>Identical result</dd></div><div><dt>Trades submitted</dt><dd>None</dd></div></dl><a class="text-link" href="/evidence/mainnet-pilot.json">Download sanitized evidence <span>↓</span></a></article>
-    <article class="evidence-copy"><h3>Checked end to end.</h3><p>The buyer authenticated the invoice. The provider checked the exact recipient note, amount, memo, request binding and confirmations. The buyer then authenticated and decrypted the research report.</p><h3>Honest about the limits.</h3><p>This is recorded acceptance evidence, not a public cryptographic proof or independent security certification. Wallet freshness checks delayed completion to approximately 23 minutes after broadcast.</p><p>Wallet and indexer observations are trusted. IP addresses and timing are not hidden. Private identifiers and research contents are omitted from public evidence.</p><a class="text-link" href="https://github.com/Cyano88/veildesk/blob/main/docs/mainnet-research-pilot-2026-10-28.md">Read the full pilot record <span>↗</span></a></article></div>
+    <div class="evidence-grid"><article class="receipt"><div class="receipt-top"><span>COMPLETED MAINNET PILOT</span><span>↗</span></div><dl><div><dt>Service</dt><dd>PolyDesk market research</dd></div><div><dt>Service payment</dt><dd>0.0002 ZEC</dd></div><div><dt>Network fee</dt><dd>0.0001 ZEC</dd></div><div><dt>Receipt</dt><dd>4 confirmations</dd></div><div><dt>Encrypted report delivered</dt><dd>11,784 bytes</dd></div><div><dt>Repeated retrieval</dt><dd>Identical result</dd></div><div><dt>Trades submitted</dt><dd>None</dd></div></dl><a class="text-link" href="/evidence/mainnet-pilot.json">Download sanitized evidence <span>↓</span></a></article>
+    <article class="evidence-copy"><h3>Checked end to end.</h3><p>Receipt checks matched the recipient note, amount, memo and confirmations to the authenticated invoice. A repeated retrieval returned the same research report.</p><h3>Honest about the limits.</h3><p>This is recorded acceptance evidence, not a public cryptographic proof or independent security certification. Wallet freshness checks delayed completion to approximately 23 minutes after broadcast.</p><p>Wallet and indexer observations are trusted. Providers see authorized requests; IP addresses and timing are not hidden. Trades require separate authorization. Private identifiers and research contents are omitted from public evidence.</p><a class="text-link" href="https://github.com/Cyano88/veildesk/blob/main/docs/mainnet-research-pilot-2026-10-28.md">Read the full pilot record <span>↗</span></a></article></div>
   </div></section>
 
   <section id="integrate" class="section wrap">
     <div class="section-top"><p class="eyebrow">05 — THE ECOSYSTEM</p><span class="section-index">BUILT TO CONNECT</span></div>
     <div class="section-title"><h2>Your agent.<br>A more private workflow.</h2><p>For agent builders, service providers and prediction-market applications. Start with the integration that works today.</p></div>
-    <div class="integration-grid"><article><div class="integration-top"><span class="integration-logo">PolyDesk<span>↗</span></span><span class="tag">INTEGRATED</span></div><h3>The first service provider.</h3><p>PolyDesk owns research, retrieval and inference. VeilDesk handles private coordination, request-bound payment verification and encrypted delivery.</p><a href="https://polydesk.trade/docs/veildesk">Explore the integration ↗</a></article><article><div class="integration-top"><span class="integration-logo">Zcash<span>Z</span></span><span class="tag">SETTLEMENT</span></div><h3>Private service payments.</h3><p>Shielded ZEC settlement was exercised in the controlled mainnet pilot. Paid access currently requires operator enrollment and pinned provider keys.</p><a href="https://github.com/Cyano88/veildesk/blob/main/docs/judge-guide.md">Read the technical scope ↗</a></article><article><div class="integration-top"><span class="integration-logo">OKX AI<span>↗</span></span><span class="tag planned">PLANNED</span></div><h3>A path to more agents.</h3><p>VeilDesk is not yet listed on OKX AI. Marketplace eligibility, broader provider enrollment and additional service adapters remain future work.</p><a href="https://github.com/Cyano88/veildesk#readme">Follow the project ↗</a></article></div>
-    <p class="note">Integration and infrastructure references describe technical use, not commercial partnerships. The MCP adapter supports previews; it does not send ZEC or expose paid research tools.</p>
+    <div class="integration-grid"><article><div class="integration-top"><span class="integration-logo polydesk-logo"><img src="/brand/polydesk.svg" width="32" height="32" alt="">PolyDesk</span><span class="tag">INTEGRATED</span></div><h3>The first service provider.</h3><p>The first integrated provider: market research, retrieval and inference for an enrolled buyer agent.</p><a href="https://polydesk.trade/">Visit PolyDesk ↗</a></article><article><div class="integration-top"><img class="ecosystem-logo zcash-logo" src="/brand/zcash.svg" width="122" height="32" alt="Zcash"><span class="tag">SETTLEMENT</span></div><h3>Private service payments.</h3><p>The settlement network. Paid service access currently requires operator enrollment and pinned provider keys.</p><a href="https://github.com/Cyano88/veildesk/blob/main/docs/judge-guide.md">Read the technical scope ↗</a></article><article><div class="integration-top"><span class="okx-logo-frame"><img class="ecosystem-logo okx-logo" src="/brand/okx-ai.png" width="118" height="75" alt="OKX AI"></span><span class="tag planned">PLANNED</span></div><h3>A path to more agents.</h3><p>VeilDesk is not yet listed on OKX AI. Marketplace eligibility, broader provider enrollment and additional service adapters remain future work.</p></article></div>
+    <p class="note">Ecosystem references describe technical use or planned availability, not commercial partnerships.</p>
   </section>
-  <section class="closing wrap"><p class="eyebrow">PRIVATE BY INTENT. VERIFIED ON DELIVERY.</p><h2>Build the next<br>agent connection.</h2><div class="actions"><a class="button" href="https://polydesk.trade/docs/veildesk">Read integration docs <span>↗</span></a><a class="text-link" href="https://github.com/Cyano88/veildesk">Explore the source <span>↗</span></a></div></section>
 </main>
-<footer class="wrap"><div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>VeilDesk</a><p>Private coordination for agent services.<br>Built by PolyDesk · 2026</p></div><div class="footer-links"><a href="https://polydesk.trade/docs/veildesk">Documentation ↗</a><a href="https://github.com/Cyano88/veildesk">GitHub ↗</a><a href="/demo.mp4">Demo video ↗</a><a href="#evidence">Evidence ↑</a></div></footer>
+<footer class="wrap"><div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>VeilDesk</a><p>Built by PolyDesk · 2026</p></div><div class="footer-links"><a href="https://github.com/Cyano88/veildesk">GitHub ↗</a><a href="/demo.mp4">Demo video ↗</a></div></footer>
 </body></html>

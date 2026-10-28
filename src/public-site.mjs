@@ -3,6 +3,9 @@ import {createReadStream} from 'node:fs';
 import {pipeline} from 'node:stream/promises';
 const files=new Map([
  ['/', ['../web/index.html','text/html; charset=utf-8']],
+ ['/brand/polydesk.svg',['../web/brand/polydesk.svg','image/svg+xml']],
+ ['/brand/zcash.svg',['../web/brand/zcash.svg','image/svg+xml']],
+ ['/brand/okx-ai.png',['../web/brand/okx-ai.png','image/png']],
  ['/app.mjs',['../web/app.mjs','text/javascript; charset=utf-8']],
  ['/style.css',['../web/style.css','text/css; charset=utf-8']],
  ['/envelope.mjs',['./envelope.mjs','text/javascript; charset=utf-8']],
