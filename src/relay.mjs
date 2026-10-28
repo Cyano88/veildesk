@@ -1,6 +1,7 @@
 import {DatabaseSync} from 'node:sqlite';
 import {createHash,timingSafeEqual} from 'node:crypto';
 import {createServer} from 'node:http';
+import {servePublicSite} from './public-site.mjs';
 const digest=x=>createHash('sha256').update(x).digest('hex');
 const uuid=x=>typeof x==='string'&&/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(x);
 const paidCapability=x=>['prediction.mandate.validate.testnet-paid.v1','polydesk.research.testnet-paid.v1','prediction.mandate.validate.mainnet-paid.v1','polydesk.research.mainnet-paid.v1'].includes(x);
@@ -62,6 +63,7 @@ export function createRelay({database,principals,providers,now=Date.now,maxPendi
  })}
  function exact(b,fields){if(!b||typeof b!=='object'||Array.isArray(b)||Object.keys(b).length!==fields.length||Object.keys(b).some(k=>!fields.includes(k)))fail(400,'Invalid request fields')}
  const server=createServer(async(req,res)=>{
+  if(await servePublicSite(req,res))return;
   res.setHeader('Cache-Control','no-store');res.setHeader('Content-Type','application/json');res.setHeader('X-Content-Type-Options','nosniff');
   let status=200,result;
   try{

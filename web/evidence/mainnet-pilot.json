@@ -1,0 +1,54 @@
+{
+  "schema": "veildesk.public-pilot-summary.v1",
+  "evidenceType": "Recorded operator acceptance report; not an independently verifiable public chain proof",
+  "recordedAt": "2026-10-28T09:22:35.412Z",
+  "acceptance": {
+    "network": "main",
+    "stage": "Verified shielded payment and encrypted research delivered",
+    "researchEngine": "PolyDesk",
+    "researchStatus": "AVAILABLE",
+    "serviceAmountZat": 20000,
+    "servicePaymentSent": true,
+    "settlementVerified": true,
+    "tradeSubmitted": false,
+    "invoiceAuthenticated": true,
+    "invoiceBoundToRequest": true,
+    "invoiceExpiresAt": "2026-10-28T09:23:53.275Z",
+    "transactionPrepared": true,
+    "nativeShieldedOnly": true,
+    "budget": {
+      "amountZat": 20000,
+      "feeZat": 10000,
+      "totalZat": 30000,
+      "quotedZecUsd": "1312.695",
+      "maxUsd": "1.00"
+    },
+    "reportDelivered": true,
+    "reportSchema": "polydesk-a2a-market-research-v1",
+    "reportBytes": 11784,
+    "reportDigest": "82035168b2ba60e561ddf5349b89b3c49d3b68f6f5d3393c03a0c944c526c7b1",
+    "confirmations": 4,
+    "replayVerified": true,
+    "executionAuthorized": false,
+    "completedAt": "2026-10-28T09:15:01.239Z"
+  },
+  "sourceCommits": {
+    "veildeskPublished": "7c698ece0076e03bdd11ba57f3317a15bf58949d",
+    "walletAndProviderRuntime": "2dd3c860cbcf6d93b9df5f30d952b3d2c962f58d",
+    "relay": "5f548a80d77410bf4ebbd23bc59589217bb1adef",
+    "polyDeskWorker": "17294aff85c21ef703095563abe4b012e2c8a932"
+  },
+  "recordedReleaseTests": {
+    "passed": 85,
+    "failed": 0,
+    "optionalSkipped": 2
+  },
+  "limitations": [
+    "One controlled mainnet purchase, not a production availability or throughput certification",
+    "Wallet and indexer trusted for chain observation",
+    "Relay does not provide network anonymity",
+    "Compute belongs to PolyDesk; no independent compute attestation claimed"
+  ],
+  "privacy": "Addresses, transaction IDs, invoice memos, credentials and research contents omitted",
+  "video": "/demo.mp4"
+}

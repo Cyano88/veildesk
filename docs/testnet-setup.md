@@ -1,3 +1,5 @@
+> Historical checkpoint. For the completed mainnet pilot and current scope, see [the current README](../README.md) and [28 October pilot record](mainnet-research-pilot-2026-10-28.md). Earlier statements that settlement was pending describe the state at that time.
+
 # Current testnet setup
 
 Use Zallet with a compatible Zebra build. Do not install zcashd: its official end-of-life notice says it cannot follow NU6.3. The prototype src/zcash.mjs is a legacy fixture-tested adapter, not a verified Zallet adapter. Its z_listreceivedbyaddress method is absent from Zallet's documented current interface.

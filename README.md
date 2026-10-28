@@ -1,90 +1,94 @@
 # VeilDesk by PolyDesk
 
-Private coordination for prediction-market agents. New standalone developer preview; PolyDesk remains an optional integration.
+**Private, authenticated agent-service requests with shielded Zcash settlement and encrypted delivery.**
 
-Live on Render: [relay health](https://veildesk-relay.onrender.com/healthz).
-The API and provider run in the cloud with persistent disks. Enrolled clients can
-submit authenticated encrypted preview mandates and verify encrypted results.
-See [live deployment evidence](docs/render-live-2026-10-27.md). API access requires
-enrollment; this endpoint is not the browser demo. ZEC payments, trading and the
-OKX.AI listing remain disabled or pending.
+An agent should be able to buy a useful service without publishing its request or payment relationship. VeilDesk provides signed encrypted coordination, invoices bound to the authorized request, payment-note reservation, and authenticated encrypted results. **PolyDesk is the first working service provider**: an independent buyer agent purchased real prediction-market research using shielded ZEC on mainnet.
 
-## Agent integration
+**[Try the public walkthrough](https://veildesk-relay.onrender.com/) · [Watch the two-minute demo](https://veildesk-relay.onrender.com/demo.mp4) · [Read the judge guide](docs/judge-guide.md) · [Inspect the evidence summary](https://veildesk-relay.onrender.com/evidence/mainnet-pilot.json)**
 
-Use the [MCP agent adapter](docs/agent-mcp.md) to submit and retrieve private
-preview mandates directly through Render. It uses enrolled endpoint keys, not
-Privy, and requires no npm dependencies or local blockchain node. The SDK is also
-available for direct application integration.
+## What is real
 
-## Run
+The controlled mainnet purchase completed on **28 October 2026 at 09:15:01 UTC**:
 
-The relay/SDK package requires Node 24.14.x. No runtime dependencies.
+| Check | Recorded result |
+| --- | --- |
+| Buyer | Independent, operator-enrolled agent |
+| Service | Real PolyDesk market research |
+| Shielded payment | 0.0002 ZEC service amount + 0.0001 ZEC network fee |
+| Request binding | Authenticated invoice and signed payment hint bound to the request |
+| Settlement | Native recipient-note verification; receipt records four confirmations |
+| Delivery | 11,784-byte research report, authenticated and decrypted by the buyer |
+| Replay | Repeated retrieval returned the identical authenticated result |
+| Trading | Neither authorized nor submitted |
 
-    npm start
-    npm test
-    npm run demo
+See the [mainnet pilot record](docs/mainnet-research-pilot-2026-10-28.md), [native receipt boundary](docs/native-wallet-receipts.md), and [sanitized acceptance summary](web/evidence/mainnet-pilot.json). The public summary is an **operator acceptance report**, not an independently verifiable public chain proof. It omits addresses, transaction IDs, invoice memos, credentials, and the research contents. The video includes a recorded read-only recheck of the existing purchase; it does not make another payment.
 
-Open http://127.0.0.1:5180. The demo seals a brief to an in-memory recipient and decrypts it locally. Both parties run in one browser; no research provider, payment or trade occurs. Refresh discards the keys. No telemetry or third-party resources are loaded.
+Wallet freshness checks delayed delivery to approximately **23 minutes after broadcast**. They were not bypassed. This is one successful pilot, not a production availability, throughput, or independent-security certification.
 
-## Implemented and tested
+## Try it without funds
 
-- P-256 ephemeral ECDH, HKDF-SHA256 and AES-256-GCM envelopes bound to request ID and direction.
-- Fixed 4096-byte plaintext padding; recipient decryption, tamper rejection, wrong-recipient and context rejection tests.
-- Local Zcash adapter with explicit spending approval and FullPrivacy policy; receipt checks against trusted wallet RPC fixtures.
+Open the [public walkthrough](https://veildesk-relay.onrender.com/). Enter a request, sign and encrypt it, then try changing its ciphertext, sender key, or request ID. These checks execute the real VeilDesk encryption/signature modules using temporary browser keys.
 
-## Required before launch or listing
+**The interactive sandbox runs both endpoints in your browser.** It sends no brief to PolyDesk, generates no research, and transfers no money. It is separate from the recorded cloud/mainnet pilot. No wallet, login, or production credentials are required. Refresh discards the demo keys.
 
-1. Remote authenticated key enrollment and recovery. The two-process local demo now signs mandates and receipts and prevents duplicate work; its owned-child-process bootstrap is not remote identity verification.
-2. Real synced Zcash wallet integration, shielded address validation, testnet receipt and send verification, durable invoice/note redemption, late-payment handling and reorg recovery. Late payments are now flagged for review; do not use with customer funds.
-3. Actual research delivery with attributable public sources and explicit user-controlled disclosure to PolyDesk. No automatic trade execution.
-4. Deployment supervision, health checks, successful task delivery and sustained uptime testing.
-5. Confirm OKX marketplace rules for external ZEC payment. Published subscription documentation specifies USDT billing; do not describe that as a shielded ZEC payment.
+To run it locally with **Node 24.14.x**:
 
-## Privacy boundary
+```sh
+npm start
+# Open http://127.0.0.1:5180
+npm test
+```
 
-This is not an anonymity guarantee. Providers see decrypted briefs. Network endpoints can see IP addresses, timing and traffic volume. Browser compromise can expose plaintext and keys. Fixed payload padding does not hide timing. A public trade can reveal the eventual position. No independent cryptographic audit has been performed.
+The relay/SDK has no npm runtime dependencies. Wallet operators use the separate [cloud wallet runtime](docs/cloud-wallet-runtime.md); client applications do not need a local blockchain node.
 
-## References
+## How a paid service request works
 
-https://thezecathon.com/
+1. **Authorize:** an enrolled buyer signs the service request, deadline, and explicit execution limits.
+2. **Encrypt:** the request is encrypted to the pinned provider key. The relay transports ciphertext; the authorized provider decrypts its own request.
+3. **Invoice:** the provider issues an authenticated invoice bound to the request. The buyer validates its terms and separately authorizes the payment.
+4. **Settle:** a shielded ZEC payment is checked against the exact recipient note, amount, memo, chain evidence and confirmation requirement. Durable note reservation protects against payment reuse.
+5. **Deliver:** the provider returns a signed encrypted receipt and report chunks. The buyer authenticates, decrypts and checks the report digest. Retries retrieve the same completed result.
 
-https://web3.okx.com/onchainos/dev-docs/okxai/a2a-subscription
+**Paying for research never authorizes a trade.** Execution requires separate authorization and no trade was submitted in the pilot.
 
-https://zips.z.cash/zip-0321
+## Who uses it
 
-https://zcash.github.io/rpc/z_sendmany.html
+- **Buyer-agent developers:** request services with explicit limits and verifiable, encrypted responses.
+- **Service providers:** expose paid capabilities while binding each payment to its authorized job.
+- **Prediction-market applications:** use PolyDesk research as a service without automatically exposing the request or authorizing execution.
 
-## Coordination demo
+PolyDesk owns research, retrieval and inference configuration. VeilDesk owns the coordination and payment-verification boundary. VeilDesk does not independently attest the provider's computation.
 
-Run npm run demo for a signed, encrypted, preview-only mandate sent to a separate provider process, followed by an encrypted receipt and replay check. No real market is verified, no payment occurs, and no trade is submitted. See docs/audit-2026-10-25.md for the exact scope and outstanding production requirements.
+### Integration status
 
-## Testnet integration status
+| Surface | Current scope |
+| --- | --- |
+| HTTPS relay + SDK | Cloud deployed; operator-managed enrollment and pinned endpoint keys |
+| Paid PolyDesk research | Working mainnet pilot restricted to its enrolled buyer |
+| MCP adapter | Preview mandates only; no paid-research tools or automatic ZEC sending |
+| Additional service providers | Planned enrollment and service-adapter work |
+| OKX AI marketplace | Not listed; external ZEC payment compatibility still requires validation |
 
-Zebra and Zallet are installed in isolated Ubuntu WSL and syncing. Live wallet capability discovery passes. The legacy payment adapter is not Zallet-compatible and is not connected to live funds. See docs/testnet-setup.md for exact versions, commands and outstanding acceptance tests.
+Start with the [integrator quickstart](docs/integrator-quickstart.md), [relay API](docs/relay-api.md), and [MCP preview adapter](docs/agent-mcp.md). The paid SDK entry point is `createPaidResearchClient` in `src/mandate-client.mjs`; the bounded operator payment tools are in `ops/mainnet-service/`. The public browser demo does not grant access to the private paid capability.
 
+## Privacy and trust boundaries
 
-## Hackathon walkthrough
+- Requests and responses use authenticated envelopes with P-256 ECDH/ECDSA, HKDF-SHA256 and AES-256-GCM. Payloads are padded to 4,096 bytes and bound to request ID, direction and recipient.
+- The authorized provider sees its decrypted request. The buyer sees the decrypted result. Endpoint compromise can expose keys and plaintext.
+- The relay can observe routing metadata, timing and traffic volume. This is **not network anonymity**, and it does not make public-market trades anonymous.
+- The wallet and configured indexer are trusted for chain observations. A signed provider receipt is not a public zero-knowledge proof.
+- There has been no independent security audit. Broader enrollment, wallet latency, failure recovery and marketplace compatibility remain rollout work.
 
-Run `node scripts/hackathon-demo.mjs` for the authenticated coordination demo and
-receipt/security tests, with timestamped evidence in `output/hackathon-evidence.json`.
-See [the two-minute walkthrough](docs/hackathon-demo.md). Real shielded payment
-acceptance remains pending; fixtures are not on-chain receipts.
+## Tests and evidence
 
+The recorded mainnet release passed **85 tests**, with **two optional checks skipped**. The selected test rerun shown in the video passed **12**, with **one optional integration check skipped**. These are distinct runs. Automated payment tests use controlled fixtures; they are not substitutes for the separately recorded real payment.
 
-## Infrastructure service
+```sh
+npm test
+npm run demo
+npm run acceptance
+```
 
-The opt-in relay and validation provider now support encrypted jobs over HTTP,
-durable retries, tenant isolation, independent endpoint signatures, restart
-recovery and a server-side PolyDesk adapter. Start with [product scope](docs/product-scope.md)
-and [API/operator instructions](docs/relay-api.md). Run `npm run acceptance` for
-source-hashed local evidence. Local Docker build/runtime checks passed; deployment,
-shielded settlement and OKX listing remain gated. The browser preview above is a
-separate surface and does not represent the service lifecycle.
+`npm run demo` and `npm run acceptance` are local rehearsals, not new mainnet payments. The [judge guide](docs/judge-guide.md) maps each claim to its source and describes reproducibility without exposing private keys or sending funds.
 
-## Optional testnet payment gate
-
-Version 0.2 adds a separate paid pilot with signed invoice challenges, encrypted
-transaction references and verified-receipt-gated delivery. Read
-[the payment lifecycle](docs/payment-lifecycle.md) before enabling anything.
-Defaults remain unpaid. The paid flow is fixture-tested; active testnet NU7 receipt
-support and real settlement remain outstanding. No marketplace listing is enabled.
+Earlier audit and testnet documents are dated historical checkpoints. The [28 October mainnet record](docs/mainnet-research-pilot-2026-10-28.md) supersedes their statements that real settlement was still pending.
