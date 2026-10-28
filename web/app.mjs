@@ -17,11 +17,11 @@ $('seal').addEventListener('click',async()=>{
 });
 async function challenge(kind){if(!session)return;const current=session;disable(true);$('seal').disabled=true;
  try{let {envelope,id,recipient,signer}=current;envelope=structuredClone(envelope);let expectedSigner=signer.publicKey;
- const labels={'tamper':'Altered ciphertext','wrong-signer':'Wrong sender key','wrong-request':'Changed request ID'};
+ const labels={'tamper':'Modified message','wrong-signer':'Sender impersonation','wrong-request':'Wrong request ID'};
  if(kind==='tamper'){const raw=Uint8Array.from(atob(envelope.ciphertext),c=>c.charCodeAt(0));raw[0]^=1;envelope.ciphertext=btoa(String.fromCharCode(...raw));}
  if(kind==='wrong-signer')expectedSigner=(await signingIdentity()).publicKey;if(kind==='wrong-request')id=crypto.randomUUID();
  let rejected=false;try{await openSigned(envelope,{recipient,expectedSigner,id,direction:'request'});}catch{rejected=true;}
- const row=document.createElement('li');row.textContent=(rejected?'PASS':'FAIL')+' — '+labels[kind]+(rejected?' rejected.':' unexpectedly accepted.');row.className=rejected?'pass':'fail';$('checks').append(row);
+ const row=document.createElement('li');row.textContent=(rejected?'Blocked':'Not blocked')+' — '+labels[kind]+(rejected?'. Verification caught the change.':'. Verification unexpectedly accepted the change.');row.className=rejected?'pass':'fail';$('checks').append(row);
  }catch{$('error').textContent='Challenge could not run; no successful check is claimed.';}finally{disable(false);$('seal').disabled=false;}
 }
 for(const id of buttons)$(id).addEventListener('click',()=>challenge(id));
