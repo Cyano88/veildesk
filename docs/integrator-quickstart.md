@@ -1,5 +1,7 @@
 # Connect a prediction-market application
 
+> This guide describes the preview-validation integration. The [current agent integration guide](../web/agent-integration.md) distinguishes it from the completed enrolled paid-research pilot and explains marketplace boundaries. The [mainnet pilot record](mainnet-research-pilot-2026-10-28.md) supersedes the historical unproven-settlement statement below.
+
 VeilDesk v0.2 validates an authenticated, bounded preview mandate and returns an
 encrypted, signed response tied to that same mandate. It does not verify that a
 market exists, assess an outcome, create research or execute a trade. Keep that

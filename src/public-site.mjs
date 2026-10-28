@@ -2,6 +2,8 @@ import {stat} from 'node:fs/promises';
 import {createReadStream} from 'node:fs';
 import {pipeline} from 'node:stream/promises';
 const files=new Map([
+ ['/agent-integration.json',['../web/agent-integration.json','application/json; charset=utf-8']],
+ ['/agent-integration.md',['../web/agent-integration.md','text/markdown; charset=utf-8']],
  ['/', ['../web/index.html','text/html; charset=utf-8']],
  ['/brand/polydesk.svg',['../web/brand/polydesk.svg','image/svg+xml']],
  ['/brand/zcash.svg',['../web/brand/zcash.svg','image/svg+xml']],

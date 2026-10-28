@@ -1,5 +1,7 @@
 # VeilDesk by PolyDesk: v1 scope and release gate
 
+> Historical scope checkpoint. The [28 October mainnet pilot](mainnet-research-pilot-2026-10-28.md) supersedes the pending-payment statements and establishes PolyDesk as the research provider, with an independent agent as buyer. For current listing preparation and remaining launch gates, see [marketplace readiness](okx-marketplace-readiness.md). Historical local passes below are not live marketplace acceptance.
+
 Status: working scope for review, 2026-10-27. NOT approved for marketplace listing.
 This document supersedes the earlier "Private Prediction Research" listing draft.
 
