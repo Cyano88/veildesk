@@ -64,6 +64,7 @@ PolyDesk owns research, retrieval and inference configuration. VeilDesk owns the
 | Surface | Current scope |
 | --- | --- |
 | HTTPS relay + SDK | Cloud deployed; operator-managed enrollment and pinned endpoint keys |
+| Direct encrypted HTTP reference | Integration candidate: [wire guide](docs/encrypted-http.md), [OpenAPI](web/openapi.json), and SDK-independent buyer; tested offline with PolyDesk |
 | Paid PolyDesk research | Working mainnet pilot restricted to its enrolled buyer |
 | MCP adapter | Preview mandates only; no paid-research tools or automatic ZEC sending |
 | Additional service providers | Planned enrollment and service-adapter work |
