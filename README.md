@@ -25,6 +25,8 @@ See the [mainnet pilot record](docs/mainnet-research-pilot-2026-10-28.md), [nati
 
 Wallet freshness checks delayed delivery to approximately **23 minutes after broadcast**. They were not bypassed. This is one successful pilot, not a production availability, throughput, or independent-security certification.
 
+The [30 October latency update](docs/latency-release-2026-10-30.md) removes redundant wallet work and adds authenticated buyer progress. Recent deployed scan stages took 54–57 seconds; the full paid purchase has **not** been retimed, so the recorded 23-minute result remains the end-to-end evidence.
+
 ## Try it without funds
 
 Open the [public walkthrough](https://veildesk-relay.onrender.com/). Enter a request, sign and encrypt it, then try changing its ciphertext, sender key, or request ID. These checks execute the real VeilDesk encryption/signature modules using temporary browser keys.

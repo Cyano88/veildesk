@@ -65,8 +65,12 @@ export function createPaidProvider({database,network,account,address,amount,node
    if(row.state==='review')return publishReview(row.review);
    if(row.state==='preparing')throw Error('Paid result pending reconciliation; do not execute again');
    if(now()>=mandate.expiresAt)return publishReview('mandate_expired_review');
-   if(!recipientChecked)await paymentBackend.recipient();
-   await rpc('/v1/provider/invoice',{method:'POST',body:{client:job.client,id:job.id,envelope:JSON.parse(row.challenge)}});
+   // Native receipt verification binds the recipient on every fresh capture.
+   // Once a payment hint exists, do not run another expensive zero-tx scan or
+   // republish the invoice before authenticating that hint. Legacy Zallet keeps
+   // its separate account-recipient check.
+   if(!recipientChecked&&(!job.paymentHint||paymentBackend.id==='zallet-testnet-v1'))await paymentBackend.recipient();
+   if(!job.paymentHint)await rpc('/v1/provider/invoice',{method:'POST',body:{client:job.client,id:job.id,envelope:JSON.parse(row.challenge)}});
    if(!job.paymentHint)return {state:'awaiting_payment',executionAuthorized:false};
    const i=JSON.parse(row.invoice),hint=await openSigned(job.paymentHint,{recipient,expectedSigner:peer.signingKey,id:job.id,direction:'request'});
    if(hint?.schema!=='veildesk.payment-hint.v1'||hint.provider!==job.provider||hint.capability!==job.capability||hint.invoiceHash!==paymentHash(i)||hint[hashField]!==paymentHash(mandate)||typeof hint.txid!=='string'||!/^[a-f0-9]{64}$/.test(hint.txid))throw Error('Payment hint authentication or binding failed');

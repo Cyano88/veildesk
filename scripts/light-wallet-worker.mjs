@@ -9,6 +9,7 @@ import {createWalletBridgeProcessor} from '../src/wallet-bridge.mjs';
 import {loadEndpointIdentity} from '../src/endpoint-identity.mjs';
 import {relayClient} from '../src/client.mjs';
 import {providerScheduler} from '../src/provider-scheduler.mjs';
+import {walletWorkCycle} from '../src/wallet-work-cycle.mjs';
 process.umask(0o077);
 const network=process.env.VEILDESK_WALLET_NETWORK??'test';walletNetwork(network);
 const root=network==='main'?'/var/data/veildesk-mainnet-recipient':'/var/data/veildesk-light-wallet';
@@ -24,8 +25,9 @@ await mkdir(root,{recursive:true,mode:0o700});
 // All sync, capture and bridge work runs serially under the container's OS flock.
 async function save(name,value){const path=join(root,name+'.tmp');await writeFile(path,JSON.stringify(value),{mode:0o600});await rename(path,join(root,name+'.json'))}
 let stopping=false,tick,nextScan=0;process.on('SIGTERM',()=>{stopping=true});process.on('SIGINT',()=>{stopping=true});
+const onTiming=measurement=>console.log(JSON.stringify({event:'wallet_stage_timing',...measurement}));
 async function capture(query){
- const scan=await syncWalletCycle({root,binary,password,network});
+ const scan=await syncWalletCycle({root,binary,password,network,onTiming,combinedSession:true});
  const snapshot=await captureNativeEvidence({root,binary:native,query,scan,network});
  verifyLightWalletSnapshot(snapshot,{address:query.address,accountId:query.accountId,now:Date.now(),network});
  const ready={...scan,nativeRecipientVerified:true};await save('status',ready);nextScan=Date.now()+120000;
@@ -33,8 +35,8 @@ async function capture(query){
 }
 while(!stopping){
  try{
-  if(Date.now()>=nextScan){
-   const scan=await syncWalletCycle({root,binary,password,network});
+  await walletWorkCycle({tick,scanDue:()=>Date.now()>=nextScan,shouldStop:()=>stopping,scan:async()=>{
+   const scan=await syncWalletCycle({root,binary,password,network,onTiming,combinedSession:true});
    const addresses=await walletCommand(binary,join(root,'wallet'),'addresses',{network});
    const address=addresses[0].encoded_address,accountId=addresses[0].account;
    const snapshot=await captureNativeEvidence({root,binary:native,query:{address,accountId,txid:'0'.repeat(64)},scan,network});
@@ -51,8 +53,7 @@ while(!stopping){
      onJobError:()=>console.error('Authenticated wallet request requires reconciliation; no payload logged.')});
     console.log(JSON.stringify({event:'wallet_bridge_ready',publicWalletRpc:false,spendingEnabled:false}));
    }
-  }
-  if(tick)await tick();
+  }});
  }catch{const failed={event:'wallet_sync_or_transport_failed',syncReady:false,settlementVerified:false,paidFulfillmentEnabled:false,checkedAt:new Date().toISOString()};await save('status',failed);console.error(JSON.stringify(failed));}
  for(let seconds=0;seconds<2&&!stopping;seconds++)await new Promise(resolve=>setTimeout(resolve,1000));
 }
