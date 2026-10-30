@@ -14,12 +14,14 @@ test('light wallet readiness rejects wrong chain, unscanned outputs and stale he
 });
 test('persistent identity and encrypted offline recovery survive restart and reject changed identity',async()=>{
  const root=await mkdtemp(join(tmpdir(),'veildesk-wallet-test-'));
- const password='test-password-with-at-least-32-characters';let changed=false;
+ const password='test-password-with-at-least-32-characters';let changed=false,stale=false;const calls=[];
  const addresses=[{encoded_address:'test-recipient',account_id:0}];
  const command=async(_binary,directory,op)=>{
+  calls.push(op);
   if(op==='info'){await writeFile(join(directory,'zingo-wallet.dat'),'fixture-wallet-secret');return info}
   if(op==='addresses'){assert.equal(await readFile(join(directory,'zingo-wallet.dat'),'utf8'),'fixture-wallet-secret');return changed?[{encoded_address:'wrong-recipient'}]:addresses}
-  if(op==='sync')return progress;if(op==='height')return {height:100};throw Error('unexpected command');
+  if(op==='snapshot')return {info,progress};
+  if(op==='sync')return progress;if(op==='height')return {height:stale?99:100};throw Error('unexpected command');
  };
  try{
   const measurements=[];
@@ -28,6 +30,13 @@ test('persistent identity and encrypted offline recovery survive restart and rej
   assert.ok(measurements.some(entry=>entry.stage==='sync'&&entry.ok));
   for(const entry of measurements){assert.deepEqual(Object.keys(entry).sort(),['durationMs','ok','stage']);assert.ok(entry.durationMs>=0)}
   assert.equal((await syncWalletCycle(options)).syncReady,true);
+  calls.length=0;
+  assert.equal((await syncWalletCycle({...options,combinedSession:true})).syncReady,true);
+  assert.deepEqual(calls,['addresses','addresses','snapshot','height']);
+  stale=true;
+  await assert.rejects(syncWalletCycle({...options,combinedSession:true}),/sync_incomplete/);
+  assert.equal(JSON.parse(await readFile(join(root,'status.json'),'utf8')).syncReady,false);
+  stale=false;
   const backup=await readFile(join(root,'recovery.initial.json'),'utf8');
   assert.equal(backup.includes('fixture-wallet-secret'),false);
   await assert.rejects(syncWalletCycle({...options,password:'another-password-with-32-characters'}),/authentication/);

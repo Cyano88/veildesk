@@ -27,7 +27,7 @@ async function save(name,value){const path=join(root,name+'.tmp');await writeFil
 let stopping=false,tick,nextScan=0;process.on('SIGTERM',()=>{stopping=true});process.on('SIGINT',()=>{stopping=true});
 const onTiming=measurement=>console.log(JSON.stringify({event:'wallet_stage_timing',...measurement}));
 async function capture(query){
- const scan=await syncWalletCycle({root,binary,password,network,onTiming});
+ const scan=await syncWalletCycle({root,binary,password,network,onTiming,combinedSession:true});
  const snapshot=await captureNativeEvidence({root,binary:native,query,scan,network});
  verifyLightWalletSnapshot(snapshot,{address:query.address,accountId:query.accountId,now:Date.now(),network});
  const ready={...scan,nativeRecipientVerified:true};await save('status',ready);nextScan=Date.now()+120000;
@@ -36,7 +36,7 @@ async function capture(query){
 while(!stopping){
  try{
   await walletWorkCycle({tick,scanDue:()=>Date.now()>=nextScan,shouldStop:()=>stopping,scan:async()=>{
-   const scan=await syncWalletCycle({root,binary,password,network,onTiming});
+   const scan=await syncWalletCycle({root,binary,password,network,onTiming,combinedSession:true});
    const addresses=await walletCommand(binary,join(root,'wallet'),'addresses',{network});
    const address=addresses[0].encoded_address,accountId=addresses[0].account;
    const snapshot=await captureNativeEvidence({root,binary:native,query:{address,accountId,txid:'0'.repeat(64)},scan,network});

@@ -4,6 +4,7 @@ import {join,resolve} from 'node:path';
 import {createHash} from 'node:crypto';
 import {createCheckpoint,restoreCheckpoint} from './checkpoint.mjs';
 import {walletNetwork} from './zcash-network.mjs';
+import {parseWalletSession} from './wallet-session.mjs';
 
 export const TESTNET_INDEXER='https://testnet.zec.rocks:443';
 const digest=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -29,12 +30,13 @@ export function verifyScan(info,progress,saved,{network='test'}={}){
 // Only fixed read/sync commands are reachable. Never forward arbitrary CLI arguments or raw output to logs.
 export function walletCommand(binary,directory,operation,{timeout=540000,env=process.env,network='test'}={}){
  const config=walletNetwork(network);
- const commands={info:['--server',config.indexer,'--nosync','--waitsync','info'],
+ const commands={snapshot:['--server',config.indexer,'--waitsync'],info:['--server',config.indexer,'--nosync','--waitsync','info'],
   sync:['--server',config.indexer,'--waitsync','sync','status'],height:['--offline','height'],addresses:['--offline','addresses']};
  if(!Object.hasOwn(commands,operation))throw Error('wallet_command_forbidden');
  const childEnv=Object.fromEntries(['PATH','HOME','USERPROFILE','SystemRoot','TEMP','TMP','LANG','LC_ALL','LD_LIBRARY_PATH','ZINGO_NYM_PROXY'].filter(k=>typeof env[k]==='string').map(k=>[k,env[k]]));
  return new Promise((accept,reject)=>{
-  const child=spawn(binary,['--chain',config.chain,'--data-dir',directory,...commands[operation]],{env:childEnv,stdio:['ignore','pipe','pipe'],detached:process.platform!=='win32'});
+  const child=spawn(binary,['--chain',config.chain,'--data-dir',directory,...commands[operation]],{env:childEnv,stdio:[operation==='snapshot'?'pipe':'ignore','pipe','pipe'],detached:process.platform!=='win32'});
+  if(operation==='snapshot'){child.stdin.on('error',()=>{});child.stdin.end('info\nsync status\nquit\n')}
   let output='',bytes=0,failure;const limit=4*1024*1024;
   function terminate(reason){failure??=reason;try{if(process.platform==='win32')child.kill('SIGKILL');else process.kill(-child.pid,'SIGKILL')}catch{}}
   const timer=setTimeout(()=>terminate('wallet_command_timeout'),timeout);
@@ -42,11 +44,11 @@ export function walletCommand(binary,directory,operation,{timeout=540000,env=pro
   child.stderr.on('data',chunk=>{bytes+=chunk.length;if(bytes>limit)terminate('wallet_output_limit')});
   child.once('error',()=>{clearTimeout(timer);reject(Error('wallet_command_start_failed'))});
   child.once('close',code=>{clearTimeout(timer);if(failure||code!==0)return reject(Error(failure??'wallet_command_failed'));
-   try{accept(JSON.parse(output))}catch{reject(Error('wallet_command_invalid_json'))}});
+   try{accept(operation==='snapshot'?parseWalletSession(output):JSON.parse(output))}catch{reject(Error('wallet_command_invalid_json'))}});
  });
 }
 
-export async function syncWalletCycle({root,binary,password,command=walletCommand,network='test',onTiming=()=>{}}){
+export async function syncWalletCycle({root,binary,password,command=walletCommand,network='test',onTiming=()=>{},combinedSession=false}){
  walletNetwork(network);
  // Only stage names, elapsed time and success are observable. Never emit
  // wallet command output, recipient addresses or recovery material.
@@ -62,8 +64,9 @@ export async function syncWalletCycle({root,binary,password,command=walletComman
  await atomic(join(root,'status.json'),{network,syncReady:false,settlementVerified:false,paidFulfillmentEnabled:false,checkedAt:new Date().toISOString()});
  if(established&&(!await exists(directory)||(await readdir(directory)).length===0))throw Error('wallet_state_missing');
  await mkdir(directory,{recursive:true,mode:0o700});
- const info=await execute(binary,directory,'info');
- if(info?.chain_name!==network)throw Error('wallet_wrong_network');
+ const combined=established&&combinedSession;
+ let info=combined?null:await execute(binary,directory,'info');
+ if(!combined&&info?.chain_name!==network)throw Error('wallet_wrong_network');
  const addresses=await execute(binary,directory,'addresses');
  if(!Array.isArray(addresses)||addresses.length===0)throw Error('wallet_recipient_missing');
  const identity={schema:'veildesk.light-wallet-identity.v1',network,addressDigest:digest(addresses)};
@@ -82,7 +85,10 @@ export async function syncWalletCycle({root,binary,password,command=walletComman
    await atomic(verified,{schema:'veildesk.wallet-recovery-check.v1',addressDigest:identity.addressDigest,offlineRestoreVerified:true});
   }finally{await rm(restored,{recursive:true,force:true})}
  }
- const progress=await execute(binary,directory,'sync');
+ let progress;
+ if(combined){({info,progress}=await execute(binary,directory,'snapshot'))}
+ else progress=await execute(binary,directory,'sync');
+ // A separate offline reopen checks persisted state after the session exits.
  const saved=await execute(binary,directory,'height');
  const status={...verifyScan(info,progress,saved,{network}),offlineRecoveryVerified:true,checkedAt:new Date().toISOString()};
  await atomic(join(root,'status.json'),status);return status;
