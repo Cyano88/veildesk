@@ -1,5 +1,11 @@
 # Service-bound shielded payment gate
 
+The initial implementation sections below are a historical testnet checkpoint.
+The [28 October mainnet pilot](mainnet-research-pilot-2026-10-28.md) supersedes their
+statements that deployment and real research purchases are still pending. Paid
+access remains restricted to the enrolled pilot buyer. See the
+[30 October release status](latency-release-2026-10-30.md) for current latency evidence.
+
 The explicit `polydesk.research.testnet-paid.v1` capability now reuses the Zallet receipt verifier and durable payment ledger for research purchases. This is implemented and fixture-tested, not evidence of an actual shielded payment. No production provider enrollment or worker configuration enables it yet.
 
 ## Request and authorization
