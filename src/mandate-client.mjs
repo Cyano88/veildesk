@@ -60,7 +60,7 @@ export async function createMandateClient({config,stateDirectory}){
     if(!paid||review.payload?.status!=='payment_review'||review.payload[hashField]!==mandateHash||review.payload.paymentVerified!==false||review.payload.tradeSubmitted!==false)throw Error('Invalid payment review response');
     paymentReview=review.payload;
    }
-   if(job.state!=='completed')return {id,state:job.state,late:Date.now()>=request.expiresAt,...(quote?{payment:quote}:{}),...(paymentReview?{paymentReview}:{}),executionAuthorized:false};
+   if(job.state!=='completed')return {id,state:job.state,paymentHintSubmitted:!!job.paymentHint,late:Date.now()>=request.expiresAt,...(quote?{payment:quote}:{}),...(paymentReview?{paymentReview}:{}),executionAuthorized:false};
    if(paymentReview)throw Error('Payment under review cannot authorize completion');
    const result=await openPrivateResult(job,{recipient,expectedSigner:config.provider.signingKey});
    if(research){

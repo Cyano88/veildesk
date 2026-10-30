@@ -144,7 +144,11 @@ test('native settlement backend gates authenticated payment and preserves restar
   fixture.setBranch('ffffffff');await assert.rejects(f.process(),/unsupported/);assert.equal((await f.client.get(f.job.id)).payment,undefined);
   fixture.setBranch('77190ad9');await f.process();const quote=(await f.client.get(f.job.id)).payment;
   fixture.setInvoice(quote.invoice);const job=await f.fund();
+  const capturesBefore=fixture.captures();
   await f.process(job);const received=await f.client.get(job.id);
+  // Two independent receipt captures before work, two after delivery uploads;
+  // no extra zero-transaction readiness scan on a funded native job.
+  assert.equal(fixture.captures()-capturesBefore,4);
   assert.equal(received.result.payload.paymentVerified,true);assert.equal(received.result.payload.tradeSubmitted,false);
   assert.equal(received.result.payload.payment.noteId,txid+':ironwood:0');
   f.restart();await f.process(job);assert.deepEqual((await f.client.get(job.id)).result,received.result);

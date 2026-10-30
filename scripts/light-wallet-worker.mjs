@@ -24,8 +24,9 @@ await mkdir(root,{recursive:true,mode:0o700});
 // All sync, capture and bridge work runs serially under the container's OS flock.
 async function save(name,value){const path=join(root,name+'.tmp');await writeFile(path,JSON.stringify(value),{mode:0o600});await rename(path,join(root,name+'.json'))}
 let stopping=false,tick,nextScan=0;process.on('SIGTERM',()=>{stopping=true});process.on('SIGINT',()=>{stopping=true});
+const onTiming=measurement=>console.log(JSON.stringify({event:'wallet_stage_timing',...measurement}));
 async function capture(query){
- const scan=await syncWalletCycle({root,binary,password,network});
+ const scan=await syncWalletCycle({root,binary,password,network,onTiming});
  const snapshot=await captureNativeEvidence({root,binary:native,query,scan,network});
  verifyLightWalletSnapshot(snapshot,{address:query.address,accountId:query.accountId,now:Date.now(),network});
  const ready={...scan,nativeRecipientVerified:true};await save('status',ready);nextScan=Date.now()+120000;
@@ -34,7 +35,7 @@ async function capture(query){
 while(!stopping){
  try{
   if(Date.now()>=nextScan){
-   const scan=await syncWalletCycle({root,binary,password,network});
+   const scan=await syncWalletCycle({root,binary,password,network,onTiming});
    const addresses=await walletCommand(binary,join(root,'wallet'),'addresses',{network});
    const address=addresses[0].encoded_address,accountId=addresses[0].account;
    const snapshot=await captureNativeEvidence({root,binary:native,query:{address,accountId,txid:'0'.repeat(64)},scan,network});

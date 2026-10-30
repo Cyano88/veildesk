@@ -46,9 +46,15 @@ export function walletCommand(binary,directory,operation,{timeout=540000,env=pro
  });
 }
 
-export async function syncWalletCycle({root,binary,password,command=walletCommand,network='test'}){
+export async function syncWalletCycle({root,binary,password,command=walletCommand,network='test',onTiming=()=>{}}){
  walletNetwork(network);
- const execute=(binary,directory,operation)=>command(binary,directory,operation,{network});
+ // Only stage names, elapsed time and success are observable. Never emit
+ // wallet command output, recipient addresses or recovery material.
+ const execute=async(binary,directory,operation)=>{
+  const started=performance.now();let ok=false;
+  try{const result=await command(binary,directory,operation,{network});ok=true;return result}
+  finally{try{onTiming({stage:operation,durationMs:Math.round(performance.now()-started),ok})}catch{}}
+ };
  root=resolve(root);const directory=join(root,'wallet'),identityPath=join(root,'identity.json');
  await mkdir(root,{recursive:true,mode:0o700});
  const established=await exists(identityPath);

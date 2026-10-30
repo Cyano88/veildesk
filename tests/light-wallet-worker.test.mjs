@@ -22,8 +22,11 @@ test('persistent identity and encrypted offline recovery survive restart and rej
   if(op==='sync')return progress;if(op==='height')return {height:100};throw Error('unexpected command');
  };
  try{
-  const options={root,password,binary:'fixture',command};
+  const measurements=[];
+  const options={root,password,binary:'fixture',command,onTiming:entry=>{measurements.push(entry);throw Error('observer failure')}};
   assert.equal((await syncWalletCycle(options)).offlineRecoveryVerified,true);
+  assert.ok(measurements.some(entry=>entry.stage==='sync'&&entry.ok));
+  for(const entry of measurements){assert.deepEqual(Object.keys(entry).sort(),['durationMs','ok','stage']);assert.ok(entry.durationMs>=0)}
   assert.equal((await syncWalletCycle(options)).syncReady,true);
   const backup=await readFile(join(root,'recovery.initial.json'),'utf8');
   assert.equal(backup.includes('fixture-wallet-secret'),false);
